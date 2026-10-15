@@ -1,0 +1,179 @@
+.hc-container {
+  max-width: 900px;
+  margin: 30px auto;
+  padding: 0 20px;
+  font-family: 'Segoe UI', Roboto, sans-serif;
+}
+
+.hc-header {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-bottom: 30px;
+}
+
+.hc-titulo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #34495e;
+  margin: 0;
+  font-size: 1.8rem;
+}
+
+/* Tarjetas de Historias */
+.lista-hc {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.hc-card {
+  background-color: #fff;
+  border: 1px solid #e1e8ed;
+  border-left: 5px solid #3498db; 
+  border-radius: 8px;
+  padding: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.04);
+  transition: transform 0.2s;
+}
+
+.hc-card:hover {
+  transform: translateX(5px);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+
+.hc-fecha {
+  margin: 0 0 8px 0;
+  font-size: 1.1rem;
+  color: #2c3e50;
+}
+
+.hc-resumen {
+  margin: 0 0 6px 0;
+  font-size: 0.95rem;
+  color: #555;
+  font-style: italic;
+}
+
+.hc-firma {
+  margin: 0 0 5px 0;
+  font-size: 0.9rem;
+  color: #7f8c8d;
+}
+
+.hc-modificado {
+  font-size: 0.8rem;
+  color: #e67e22;
+  font-weight: 500;
+}
+
+.hc-acciones {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.btn-ver {
+  background-color: #ecf0f1;
+  color: #2c3e50;
+  border: none;
+  padding: 8px 15px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.btn-ver:hover {
+  background-color: #bdc3c7;
+}
+
+/* Modal Extendido */
+.modal-overlay-hc {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: rgba(0,0,0,0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content-hc {
+  background-color: #fff;
+  padding: 25px 30px;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 700px; /* Modal más ancho para texto largo */
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-header-hc {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+  border-bottom: 1px solid #ecf0f1;
+  padding-bottom: 15px;
+}
+
+.modal-header-hc h3 {
+  margin: 0;
+  color: #2c3e50;
+  font-size: 1.4rem;
+}
+
+.form-hc {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.form-group-hc {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group-hc label {
+  font-weight: 600;
+  color: #34495e;
+  font-size: 0.95rem;
+}
+
+.form-group-hc textarea, .form-group-hc input {
+  padding: 12px;
+  border: 1px solid #bdc3c7;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  resize: vertical;
+}
+
+.form-group-hc textarea:focus, .form-group-hc input:focus {
+  border-color: #3498db;
+  outline: none;
+}
+
+.input-readonly {
+  background-color: #f8f9fa;
+  color: #495057;
+  cursor: not-allowed;
+  border-color: #e9ecef !important;
+}
+
+.modal-actions-hc {
+  display: flex;
+  justify-content: flex-end;
+  gap: 15px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #ecf0f1;
+}

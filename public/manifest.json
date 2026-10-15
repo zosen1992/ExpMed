@@ -1,0 +1,18 @@
+{
+  "short_name": "DemoExp",
+  "name": "Sistema de Gestión y Alertas Clínicas",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2966/2966327.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+
+ "start_url": "/DemoExp/",
+  "scope": "/DemoExp/",
+  "background_color": "#f8fafc",
+  "theme_color": "#3498db",
+  "display": "standalone",
+  "orientation": "portrait"
+}

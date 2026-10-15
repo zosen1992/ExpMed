@@ -1,0 +1,288 @@
+.modal-receta-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: rgba(15, 23, 42, 0.75);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+  padding: 20px;
+}
+
+.modal-receta-container {
+  background-color: #e2e8f0;
+  width: 100%;
+  max-width: 860px;
+  max-height: 92vh;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+}
+
+.modal-receta-toolbar {
+  background-color: #1e293b;
+  color: #ffffff;
+  padding: 14px 22px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.toolbar-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.toolbar-title svg {
+  color: #38bdf8;
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-print-now {
+  background-color: #2ecc71;
+  color: #ffffff;
+  border: none;
+  padding: 9px 18px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.92rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.2s;
+}
+
+.btn-print-now:hover {
+  background-color: #27ae60;
+}
+
+.btn-close-preview {
+  background-color: #475569;
+  color: #ffffff;
+  border: none;
+  padding: 9px 15px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.modal-receta-scroll {
+  padding: 24px;
+  overflow-y: auto;
+  display: flex;
+  justify-content: center;
+}
+
+/* Vista en pantalla con proporción Media Carta (8.5" x 5.5") */
+.modal-receta-scroll .receta-sheet {
+  background-color: #ffffff;
+  width: 100%;
+  max-width: 780px;
+  min-height: 485px;
+  border: 2px solid #1e3a8a;
+  border-radius: 10px;
+  padding: 20px 24px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-sizing: border-box;
+  text-align: left;
+}
+
+.modal-receta-scroll .receta-top-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 3px double #1e3a8a;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.modal-receta-scroll .doc-main-info {
+  text-align: left;
+  max-width: 68%;
+}
+
+.modal-receta-scroll .doc-main-info h1 {
+  margin: 0 0 3px 0;
+  color: #1e3a8a;
+  font-size: 1.2rem;
+  text-transform: uppercase;
+}
+
+.modal-receta-scroll .doc-subtitle {
+  margin: 0 0 3px 0;
+  font-weight: 700;
+  font-size: 0.84rem;
+  color: #334155;
+}
+
+.modal-receta-scroll .doc-cedulas {
+  font-size: 0.8rem;
+  color: #475569;
+  margin: 2px 0;
+}
+
+.modal-receta-scroll .doc-contact-right {
+  text-align: right;
+  font-size: 0.8rem;
+  color: #475569;
+  line-height: 1.35;
+}
+
+.modal-receta-scroll .folio-box {
+  display: inline-block;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e40af;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.modal-receta-scroll .px-info-box {
+  background-color: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  font-size: 0.85rem;
+  text-align: left;
+}
+
+.modal-receta-scroll .px-row-top {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+  padding-bottom: 4px;
+  border-bottom: 1px dashed #cbd5e1;
+}
+
+.modal-receta-scroll .px-row-bottom {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 0.8rem;
+  color: #334155;
+}
+
+.modal-receta-scroll .alergia-tag {
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+.modal-receta-scroll .rx-body {
+  text-align: left;
+  flex: 1;
+}
+
+.modal-receta-scroll .diag-line {
+  font-size: 0.85rem;
+  background: #f1f5f9;
+  padding: 6px 10px;
+  border-left: 4px solid #3b82f6;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  text-align: left;
+}
+
+.modal-receta-scroll .rx-symbol {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #1e3a8a;
+  font-family: Georgia, serif;
+  margin-bottom: 6px;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 3px;
+  text-align: left;
+}
+
+.modal-receta-scroll .rx-text {
+  white-space: pre-wrap;
+  text-align: left !important;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: #0f172a;
+  min-height: 140px;
+}
+
+.modal-receta-scroll .receta-footer {
+  margin-top: 15px;
+  padding-top: 10px;
+  border-top: 1px solid #cbd5e1;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+}
+
+.modal-receta-scroll .footer-note {
+  font-size: 0.72rem;
+  color: #64748b;
+  max-width: 55%;
+  text-align: left;
+}
+
+.modal-receta-scroll .firma-block {
+  text-align: center;
+  width: 210px;
+}
+
+.modal-receta-scroll .firma-line {
+  border-top: 1px solid #1e293b;
+  margin-bottom: 4px;
+}
+
+.modal-receta-scroll .firma-name {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.modal-receta-scroll .firma-label {
+  font-size: 0.74rem;
+  color: #64748b;
+}
+
+.modal-receta-scroll .firma-block {
+  text-align: center;
+  width: 210px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.modal-receta-scroll .firma-img {
+  max-height: 52px;
+  max-width: 185px;
+  object-fit: contain;
+  margin-bottom: -4px;
+  mix-blend-mode: multiply;
+}
+
+.modal-receta-scroll .firma-line {
+  width: 100%;
+  border-top: 1px solid #1e293b;
+  margin-bottom: 4px;
+}

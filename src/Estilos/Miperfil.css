@@ -1,0 +1,306 @@
+.miperfil-container {
+  max-width: 850px;
+  margin: 35px auto;
+  padding: 0 20px;
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+.miperfil-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.btn-regresar-perfil {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #3498db;
+  text-decoration: none;
+  font-weight: 600;
+  padding: 8px 14px;
+  background-color: #e8f4fd;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+.btn-regresar-perfil:hover {
+  background-color: #d6eaf8;
+}
+
+.btn-editar-perfil {
+  background-color: #3498db;
+  color: white;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.2s;
+}
+
+.btn-editar-perfil:hover {
+  background-color: #2980b9;
+}
+
+/* Tarjeta de perfil */
+.miperfil-card {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e1e8ed;
+  overflow: hidden;
+}
+
+.miperfil-banner {
+  background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+  color: white;
+  padding: 30px;
+  display: flex;
+  align-items: center;
+  gap: 25px;
+  flex-wrap: wrap;
+}
+
+.miperfil-avatar {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 4px solid rgba(255, 255, 255, 0.9);
+  background-color: #fff;
+}
+
+.miperfil-banner-info h2 {
+  margin: 0 0 12px 0;
+  font-size: 1.6rem;
+}
+
+.miperfil-badges {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.badge-rol, .badge-vigencia, .badge-ruta {
+  background-color: rgba(255, 255, 255, 0.2);
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Formulario interior */
+.miperfil-form {
+  padding: 30px;
+}
+
+.miperfil-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+.perfil-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field-full {
+  grid-column: 1 / -1;
+}
+
+.perfil-field label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #555;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.perfil-field input {
+  padding: 11px 14px;
+  border: 1px solid #ccd1d1;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  color: #2c3e50;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+
+.perfil-field input:focus {
+  border-color: #3498db;
+  outline: none;
+}
+
+.input-locked {
+  background-color: #f8f9fa;
+  color: #6c757d !important;
+  border-color: #e9ecef !important;
+  cursor: default;
+}
+
+.miperfil-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 25px;
+  padding-top: 20px;
+  border-top: 1px solid #ecf0f1;
+}
+
+.btn-cancelar-perfil {
+  background-color: #f1f3f5;
+  color: #495057;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-guardar-perfil {
+  background-color: #2ecc71;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.perfil-empty {
+  background: #fff;
+  padding: 40px;
+  border-radius: 12px;
+  text-align: center;
+  margin-top: 20px;
+  border: 1px solid #e1e8ed;
+}
+
+@media (max-width: 650px) {
+  .miperfil-grid {
+    grid-template-columns: 1fr;
+  }
+  .miperfil-banner {
+    flex-direction: column;
+    text-align: center;
+  }
+  .miperfil-badges {
+    justify-content: center;
+  }
+}
+
+/* Cabecera con estrellas y visibilidad */
+.miperfil-banner-info {
+  flex: 1;
+}
+
+.banner-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.banner-top-row h2 {
+  margin: 0 !important;
+}
+
+.banner-rating {
+  background-color: rgba(0, 0, 0, 0.2);
+  padding: 6px 12px;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.star-filled {
+  color: #f1c40f;
+  font-size: 1rem;
+}
+
+.star-empty {
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 1rem;
+}
+
+.rating-number {
+  margin-left: 6px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #fff;
+}
+
+/* Botón rápido de visibilidad en el banner */
+.badge-visibilidad-btn {
+  border: none;
+  padding: 5px 14px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.badge-visibilidad-btn:hover {
+  transform: translateY(-1px);
+}
+
+.estado-publico {
+  background-color: #2ecc71;
+  color: #ffffff;
+}
+
+.estado-oculto {
+  background-color: #34495e;
+  color: #ffffff;
+}
+
+/* Selector y campo de calificación */
+.perfil-field select {
+  padding: 11px 14px;
+  border: 1px solid #ccd1d1;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  color: #2c3e50;
+  font-family: inherit;
+  background-color: #fff;
+  outline: none;
+}
+
+.calificacion-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.calificacion-input-wrapper input {
+  width: 90px;
+}
+
+.stars-selector {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}

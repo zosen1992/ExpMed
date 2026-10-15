@@ -1,0 +1,263 @@
+.sv-container {
+  max-width: 900px;
+  margin: 30px auto;
+  padding: 0 20px;
+  font-family: 'Segoe UI', Roboto, sans-serif;
+}
+
+.sv-header {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-bottom: 30px;
+}
+
+.sv-titulo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #f39c12; /* Color de advertencia/vitalidad */
+  margin: 0;
+  font-size: 1.8rem;
+}
+
+/* Tarjetas */
+.lista-sv {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.sv-card {
+  background-color: #fff;
+  border: 1px solid #e1e8ed;
+  border-left: 5px solid #f39c12; 
+  border-radius: 8px;
+  padding: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.04);
+  transition: transform 0.2s;
+}
+
+.sv-card:hover {
+  transform: translateX(5px);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+
+.sv-fecha {
+  margin: 0 0 12px 0;
+  font-size: 1.1rem;
+  color: #2c3e50;
+}
+
+/* Etiquetas (Badges) de Signos */
+.sv-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.badge {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.badge-blue { background-color: #3498db; }
+.badge-red { background-color: #e74c3c; }
+.badge-cyan { background-color: #00bcd4; }
+.badge-orange { background-color: #e67e22; }
+.badge-gray { background-color: #95a5a6; }
+.badge-purple { background-color: #9b59b6; }
+
+.sv-firma {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #7f8c8d;
+}
+
+.sv-acciones {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Modal */
+.modal-overlay-sv {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: rgba(0,0,0,0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content-sv {
+  background-color: #fff;
+  padding: 25px 30px;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 650px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-header-sv {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #ecf0f1;
+  padding-bottom: 10px;
+}
+
+.modal-header-sv h3 { margin: 0; color: #2c3e50; font-size: 1.4rem; }
+
+.section-title {
+  margin: 15px 0 10px 0;
+  color: #34495e;
+  border-bottom: 2px solid #ecf0f1;
+  padding-bottom: 5px;
+}
+
+/* Grids del formulario */
+.form-sv { display: flex; flex-direction: column; }
+.form-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+.form-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+
+.form-group-sv { display: flex; flex-direction: column; gap: 5px; }
+.form-group-sv label { font-size: 0.85rem; font-weight: 600; color: #7f8c8d; }
+
+.form-group-sv input, .form-group-sv textarea {
+  padding: 8px 10px;
+  border: 1px solid #bdc3c7;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-family: inherit;
+}
+
+.input-readonly-auto {
+  background-color: #e8f4fd; /* Tono azul para el IMC auto-calculado */
+  color: #2980b9;
+  font-weight: bold;
+  border-color: #3498db !important;
+  cursor: default;
+}
+
+.modal-actions-sv {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 25px;
+  padding-top: 15px;
+  border-top: 1px solid #ecf0f1;
+}
+
+.firma-sv {
+  font-size: 0.85rem;
+  color: #95a5a6;
+  font-style: italic;
+}
+
+@media (max-width: 600px) {
+  .form-grid-3, .form-grid-2 { grid-template-columns: 1fr; }
+}
+
+/* Resto de tu código superior... (mantén lo que tenías) */
+
+/* Tarjetas */
+.lista-sv {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.sv-card {
+  background-color: #fff;
+  border: 1px solid #e1e8ed;
+  border-left: 5px solid #2ecc71; /* Verde (Sano) por defecto */
+  border-radius: 8px;
+  padding: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.04);
+  transition: transform 0.2s, background-color 0.2s;
+}
+
+/* CAMBIO DE COLOR SI HAY ALERTA */
+.card-has-alerts {
+  border-left-color: #e74c3c;
+  background-color: #fffaf9;
+}
+
+.sv-alerta-icon {
+  margin-left: 10px;
+  color: #e74c3c;
+  font-size: 0.95rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background-color: #fceceb;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.sv-card:hover {
+  transform: translateX(5px);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+
+.sv-fecha {
+  margin: 0 0 12px 0;
+  font-size: 1.1rem;
+  color: #2c3e50;
+  display: flex;
+  align-items: center;
+}
+
+/* Etiquetas (Badges) de Signos */
+.sv-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.badge {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.badge-blue { background-color: #3498db; }
+.badge-red { background-color: #e74c3c; }
+.badge-cyan { background-color: #00bcd4; }
+.badge-orange { background-color: #e67e22; }
+.badge-gray { background-color: #95a5a6; }
+.badge-purple { background-color: #9b59b6; }
+.badge-green { background-color: #2ecc71; }
+
+/* ANIMACIÓN PARA PARÁMETRO FUERA DE RANGO */
+.badge-alert-pulse {
+  background-color: #e74c3c !important;
+  animation: pulse-red 2s infinite;
+  box-shadow: 0 0 0 rgba(231, 76, 60, 0.4);
+}
+
+@keyframes pulse-red {
+  0% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.7); }
+  70% { box-shadow: 0 0 0 8px rgba(231, 76, 60, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
+}
+
+/* Resto de tu código CSS... */

@@ -1,0 +1,75 @@
+.px-card-container {
+  display: flex;
+  align-items: center;
+  padding: 15px;
+  gap: 18px;
+  background-color: transparent;
+}
+
+.px-card-avatar img {
+  width: 65px;
+  height: 65px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #e1e8ed;
+}
+
+.px-card-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.px-card-name {
+  margin: 0 0 6px 0;
+  font-size: 1.15rem;
+  color: #2c3e50;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.px-card-detail {
+  display: flex;
+  align-items: center;
+  font-size: 0.85rem;
+  color: #7f8c8d;
+  margin-bottom: 4px;
+}
+
+.px-icon {
+  margin-right: 8px;
+  color: #bdc3c7;
+  font-size: 0.9rem;
+}
+
+.px-card-avatar-wrapper {
+  position: relative; /* Necesario para anclar el indicador */
+  display: inline-block;
+}
+
+.px-card-avatar {
+  width: 65px;
+  height: 65px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #e1e8ed;
+  display: block;
+}
+
+.alergia-badge {
+  position: absolute;
+  bottom: 0px;
+  right: -2px;
+  background-color: #e74c3c;
+  color: white;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 14px;
+  border: 2px solid white;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}

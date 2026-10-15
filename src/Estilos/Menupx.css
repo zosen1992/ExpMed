@@ -1,0 +1,256 @@
+/* Contenedor Global */
+.menupx-container {
+  max-width: 1100px;
+  margin: 30px auto;
+  padding: 0 20px;
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* Header de Navegación */
+.menupx-header {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 30px;
+}
+
+.btn-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background-color: #f8f9fa;
+  color: #2c3e50;
+  text-decoration: none;
+  border-radius: 8px;
+  font-weight: 500;
+  border: 1px solid #e9ecef;
+  transition: all 0.2s ease;
+}
+
+.btn-nav:hover {
+  background-color: #e9ecef;
+}
+
+.btn-back {
+  background-color: #e8f4fd;
+  color: #3498db;
+  border-color: #d6eaf8;
+}
+
+.btn-back:hover {
+  background-color: #d6eaf8;
+}
+
+/* Layout de dos columnas */
+.menupx-layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 30px;
+  align-items: start;
+}
+
+/* ==================================
+   COLUMNA IZQUIERDA: TARJETA DE PERFIL
+   ================================== */
+.px-profile-card {
+  background-color: #ffffff;
+  padding: 30px 20px;
+  border-radius: 16px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+  border: 1px solid #f1f3f5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.px-avatar {
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 4px solid #f8f9fa;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+  margin-bottom: 20px;
+}
+
+.px-name {
+  margin: 0 0 5px 0;
+  color: #2c3e50;
+  font-size: 1.4rem;
+  text-transform: capitalize;
+}
+
+.px-age {
+  background-color: #e8f4fd;
+  color: #3498db;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 25px;
+}
+
+.px-info-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-top: 1px solid #f1f3f5;
+  padding-top: 20px;
+}
+
+.px-info-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #495057;
+  font-size: 0.95rem;
+  text-align: left;
+}
+
+.info-icon {
+  color: #adb5bd;
+  font-size: 1.1rem;
+  min-width: 20px;
+}
+
+.truncate-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 230px;
+}
+
+/* ==================================
+   COLUMNA DERECHA: CUADRÍCULA DE MÓDULOS
+   ================================== */
+.px-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr); /* Esto fuerza exactamente 2 columnas del mismo tamaño */
+  gap: 20px;
+}
+
+.action-card {
+  background-color: #ffffff;
+  height: 160px;
+  border-radius: 16px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
+  border: 1px solid #f1f3f5;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-decoration: none;
+  color: #2c3e50;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  cursor: pointer;
+}
+
+.action-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.08);
+}
+
+.action-icon {
+  font-size: 3.5rem;
+  margin-bottom: 15px;
+}
+
+.action-title {
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+
+/* Colores utilitarios para los íconos */
+.text-primary { color: #3498db; }
+.text-success { color: #2ecc71; }
+.text-danger { color: #e74c3c; }
+.text-warning { color: #f39c12; }
+.text-info { color: #9b59b6; }
+
+
+/* ==================================
+   RESPONSIVE DESIGN (Tablets y celulares)
+   ================================== */
+@media (max-width: 850px) {
+  .menupx-layout {
+    grid-template-columns: 1fr; /* Colapsa a una sola columna */
+  }
+  
+  .px-profile-card {
+    flex-direction: row;
+    flex-wrap: wrap;
+    text-align: left;
+    gap: 20px;
+  }
+  
+  .px-avatar {
+    margin-bottom: 0;
+    width: 100px;
+    height: 100px;
+  }
+  
+  .px-info-list {
+    border-top: none;
+    padding-top: 0;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 500px) {
+  .px-profile-card {
+    flex-direction: column;
+    text-align: center;
+  }
+  .px-info-list {
+    flex-direction: column;
+  }
+  .px-actions-grid {
+    grid-template-columns: 1fr 1fr; /* 2 botones por fila en móvil */
+  }
+}
+
+/* ==================================
+   INDICADORES DE ALERGIA
+   ================================== */
+.alerta-alergia-link {
+  color: #e74c3c;
+  font-size: 1.4rem;
+  margin-left: 10px;
+  vertical-align: middle;
+  transition: transform 0.2s;
+  display: inline-block;
+}
+
+.alerta-alergia-link:hover {
+  transform: scale(1.2);
+}
+
+.card-alerta {
+  border-color: #e74c3c;
+  background-color: #fffaf9;
+  position: relative;
+}
+
+.card-alerta:hover {
+  background-color: #fdf3f2;
+}
+
+.text-secondary {
+  color: #95a5a6; /* Gris si no hay alergias */
+}
+
+.badge-alerta {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background-color: #e74c3c;
+  color: white;
+  font-size: 0.75rem;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-weight: 600;
+  box-shadow: 0 2px 4px rgba(231, 76, 60, 0.3);
+}

@@ -1,0 +1,223 @@
+.alergias-container {
+  max-width: 800px;
+  margin: 30px auto;
+  padding: 0 20px;
+  font-family: 'Segoe UI', Roboto, sans-serif;
+}
+
+.alergias-header {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-bottom: 30px;
+}
+
+.btn-regresar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #3498db;
+  text-decoration: none;
+  font-weight: 500;
+  align-self: flex-start;
+}
+
+.alergias-titulo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #e74c3c;
+  margin: 0;
+  font-size: 1.8rem;
+}
+
+/* Estado Vacío */
+.empty-state {
+  text-align: center;
+  background-color: #f8f9fa;
+  padding: 50px 20px;
+  border-radius: 12px;
+  border: 2px dashed #dee2e6;
+}
+
+.empty-icon {
+  font-size: 4rem;
+  color: #ced4da;
+  margin-bottom: 15px;
+}
+
+.empty-state h3 {
+  color: #495057;
+  margin-bottom: 10px;
+}
+
+.empty-state p {
+  color: #6c757d;
+  margin-bottom: 25px;
+}
+
+.btn-agregar-main {
+  background-color: #e74c3c;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.btn-agregar-main:hover {
+  background-color: #c0392b;
+}
+
+.btn-agregar-small {
+  background-color: #3498db;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+/* Recycler View (Lista de Tarjetas) */
+.lista-alergias {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.alergia-card {
+  background-color: #fff;
+  border: 1px solid #e1e8ed;
+  border-left: 5px solid #e74c3c; /* Indicador rojo de alerta */
+  border-radius: 8px;
+  padding: 15px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+  transition: transform 0.2s;
+}
+
+.alergia-card:hover {
+  transform: translateX(5px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.06);
+}
+
+.alergia-nombre {
+  margin: 0 0 8px 0;
+  font-size: 1.2rem;
+  color: #2c3e50;
+  text-transform: uppercase;
+}
+
+.alergia-firma, .alergia-nota {
+  margin: 0 0 4px 0;
+  font-size: 0.95rem;
+  color: #555;
+}
+
+.alergia-fecha {
+  margin: 5px 0 0 0;
+  font-size: 0.8rem;
+  color: #95a5a6;
+}
+
+.btn-editar {
+  background-color: #f1c40f;
+  color: #000;
+  border: none;
+  padding: 8px 15px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: rgba(0,0,0,0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background-color: #fff;
+  padding: 25px;
+  border-radius: 12px;
+  width: 90%;
+  maxWidth: 450px;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.modal-header h3 {
+  margin: 0;
+  color: #2c3e50;
+}
+
+.btn-close {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  color: #e74c3c;
+  cursor: pointer;
+}
+
+.form-alergia {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.form-alergia input, .form-alergia textarea {
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-family: inherit;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.btn-cancelar {
+  background-color: #f8f9fa;
+  border: 1px solid #ccc;
+  padding: 10px 15px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-guardar {
+  background-color: #2ecc71;
+  color: white;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}

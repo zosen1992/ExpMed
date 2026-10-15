@@ -1,0 +1,81 @@
+/* Contenedor principal de la vista */
+.dashboard-container {
+  max-width: 1000px;
+  margin: 40px auto;
+  padding: 0 20px;
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* Título de bienvenida */
+.dashboard-title {
+  text-align: center;
+  color: #2c3e50;
+  font-size: 2rem;
+  font-weight: 600;
+  margin-bottom: 40px;
+}
+
+/* Cuadrícula exacta de 3 columnas */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr); /* Fuerza 3 elementos por línea */
+  gap: 25px;
+  justify-items: center;
+}
+
+/* Estilo de cada tarjeta */
+.dashboard-card {
+  background-color: #ffffff;
+  width: 100%;
+  max-width: 250px;
+  height: 180px;
+  border-radius: 12px;
+  border: 1px solid #e1e8ed;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-decoration: none;
+  color: #34495e;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+/* Efecto al pasar el mouse (Hover) */
+.dashboard-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 12px 20px rgba(0, 0, 0, 0.1);
+  border-color: #3498db;
+}
+
+/* Tamaño y color de los íconos */
+.card-icon {
+  font-size: 3.5rem;
+  color: #3498db;
+  margin-bottom: 15px;
+  transition: color 0.3s ease;
+}
+
+.dashboard-card:hover .card-icon {
+  color: #2980b9;
+}
+
+/* Texto de la tarjeta */
+.card-title {
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+
+/* Estilo específico para el botón de cerrar sesión */
+.logout-card .card-icon {
+  color: #e74c3c;
+}
+
+.logout-card:hover {
+  border-color: #e74c3c;
+}
+
+.logout-card:hover .card-icon {
+  color: #c0392b;
+}
