@@ -1,3 +1,16 @@
+2da fase...
+
+Hacer que en la calificación pueda el paciente dejar una reseña e indicar cuantas tiene, siendo visible para todos al hacer clic en la cantidad de reseñas y solo quien la escribió puede editar
+
+Investigar sobre costos para uso de la apo de wp/como alternativa usar sms
+
+Google drive para el guardado de documentos y que estén compartidos con los que entren al apartado "estudios" desde cualquier perfil 
+
+Guardar archivos pdf desde el apartado de estudios, a un servidor ftp, pensando en el servidor de iconos del proyecto
+
+
+
+
 # React + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
