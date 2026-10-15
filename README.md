@@ -14,3 +14,18 @@ The React Compiler is not enabled on this template because of its impact on dev 
 ## Expanding the ESLint configuration
 
 If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+
+
+or create a new repository on the command line
+echo "# ExpMed" >> README.md
+git init
+git add README.md
+git commit -m "first commit"
+git branch -M main
+git remote add origin https://github.com/zosen1992/ExpMed.git
+git push -u origin main
+
+…or push an existing repository from the command line
+git remote add origin https://github.com/zosen1992/ExpMed.git
+git branch -M main
+git push -u origin main
