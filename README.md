@@ -1,3 +1,16 @@
+
+git pull
+
+
+
+bash
+git add .
+git commit -m "Mensaje descriptivo de los cambios"
+git push origin main
+
+
+
+
 2da fase...
 
 Hacer que en la calificación pueda el paciente dejar una reseña e indicar cuantas tiene, siendo visible para todos al hacer clic en la cantidad de reseñas y solo quien la escribió puede editar
