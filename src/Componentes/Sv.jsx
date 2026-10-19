@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { auth, db } from '../firebase';
 import { ref, onValue, set, push, update, get, remove } from 'firebase/database';
-import { FaArrowLeft, FaPlus, FaEdit, FaTimes, FaSave, FaEye, FaTrashAlt } from 'react-icons/fa';
+import { FaArrowLeft, FaPlus, FaEdit, FaTimes, FaSave, FaEye, FaTrashAlt, FaLock } from 'react-icons/fa';
 import { LuHeartPulse } from "react-icons/lu";
 import { PiSealWarningDuotone } from "react-icons/pi";
+import { estaVigenciaVencida } from '../utilidades/verificadorVigencia';
 import '../Estilos/Sv.css';
 
 // --- MOTOR DE VALIDACIÓN CLÍNICA ---
@@ -72,6 +73,9 @@ const Sv = () => {
   const [nombreCapturista, setNombreCapturista] = useState("");
   const [nombrePx, setNombrePx] = useState("Paciente");
   const [edadPx, setEdadPx] = useState(25);
+  const [vigenciaVencida, setVigenciaVencida] = useState(
+    localStorage.getItem('vigenciaVencida') === 'true'
+  );
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -99,16 +103,26 @@ const Sv = () => {
 
   useEffect(() => {
     if (myuid && id) {
-      // 1. Obtener nombre del usuario logueado
+      // 1. Obtener nombre y estado de vigencia del usuario logueado
       const buscarUsuarioLogueado = async () => {
         const rolLocal = localStorage.getItem('rolActivo');
         const ramas = rolLocal 
-          ? [rolLocal, 'medico', 'enfermeria', 'enfermero', 'enfemero', 'px', 'otro'] 
-          : ['medico', 'enfermeria', 'enfermero', 'enfemero', 'px', 'otro'];
+          ? [rolLocal, 'medico', 'enfermeria', 'enfermero', 'enfemero', 'px', 'admin', 'otro'] 
+          : ['medico', 'enfermeria', 'enfermero', 'enfemero', 'px', 'admin', 'otro'];
         for (const r of ramas) {
           const snap = await get(ref(db, `usuarios/${r}/${myuid}`));
           if (snap.exists()) {
-            setNombreCapturista(snap.val().nombre || snap.val().nombrecom || auth.currentUser?.email || "Usuario");
+            const val = snap.val();
+            setNombreCapturista(val.nombre || val.nombrecom || auth.currentUser?.email || "Usuario");
+
+            const rolLow = String(val.rol || r).toLowerCase();
+            if (r === 'medico' || r === 'enfermeria' || r === 'enfermero' || r === 'enfemero' || rolLow === 'medico' || rolLow.includes('enfermer')) {
+              const vencida = estaVigenciaVencida(val.vigencia);
+              setVigenciaVencida(vencida);
+              localStorage.setItem('vigenciaVencida', vencida ? 'true' : 'false');
+            } else {
+              setVigenciaVencida(false);
+            }
             break;
           }
         }
@@ -145,7 +159,6 @@ const Sv = () => {
     }
   }, [id, myuid]);
 
-  // --- FUNCIÓN PARA NOTIFICAR A LOS MÉDICOS QUE TIENEN A ESTE PACIENTE ---
   const notificarMedicosAsignados = async (mensajesAlerta, fechaRegistro, svId) => {
     try {
       const relacionesSnap = await get(ref(db, 'px'));
@@ -188,11 +201,10 @@ const Sv = () => {
   const handleChange = (e) => {
     const { name, value } = e.target;
 
-    // Restricción estricta: Saturación de Oxígeno (spo2) NO puede ser mayor a 100 ni menor a 0
     if (name === 'spo2' && value !== '') {
       const numSpo2 = parseFloat(value);
       if (numSpo2 > 100 || numSpo2 < 0) {
-        return; // Ignora la escritura si intenta pasar de 100 o poner negativos
+        return;
       }
     }
 
@@ -208,6 +220,9 @@ const Sv = () => {
   };
 
   const abrirModalNuevo = () => {
+    if (vigenciaVencida) {
+      return alert("⛔ Modo de solo lectura: Tu vigencia está vencida y no puedes registrar signos vitales.");
+    }
     setIsEditing(false); setIsReadOnly(false); setEditPid(null);
     setFormData({
       peso: '', talla: '', imc: '', tas: '', tad: '', fc: '', fr: '', 
@@ -218,7 +233,13 @@ const Sv = () => {
   };
 
   const abrirModalEditar = (item, readOnly = false) => {
-    // Seguridad: Solo el autor que agregó el registro puede editarlo
+    if (vigenciaVencida) {
+      if (item.uidcap !== myuid) {
+        return alert("Con vigencia vencida solo puedes visualizar registros creados por ti.");
+      }
+      readOnly = true;
+    }
+
     if (!readOnly && item.uidcap !== myuid) {
       return alert("Acceso denegado: Solo el usuario que agregó este registro de signos vitales puede editarlo.");
     }
@@ -237,8 +258,10 @@ const Sv = () => {
     setIsModalOpen(true);
   };
 
-  // Eliminar registro (Solo el usuario que lo agregó)
   const handleEliminar = async (item) => {
+    if (vigenciaVencida) {
+      return alert("⛔ Acción bloqueada: No puedes eliminar registros con vigencia vencida.");
+    }
     if (item.uidcap !== myuid) {
       return alert("Acceso denegado: Solo el usuario que registró estos signos vitales puede eliminarlos.");
     }
@@ -257,8 +280,10 @@ const Sv = () => {
   const handleGuardar = async (e) => {
     e.preventDefault();
     if (!myuid) return alert("Error: Sesión no válida.");
+    if (vigenciaVencida) {
+      return alert("⛔ Acción bloqueada: Tu cuenta está en modo solo lectura por vigencia vencida.");
+    }
 
-    // Validación extra por seguridad en SpO2
     if (formData.spo2 && parseFloat(formData.spo2) > 100) {
       return alert("La saturación de oxígeno (SpO2) no puede ser mayor a 100%.");
     }
@@ -318,10 +343,28 @@ const Sv = () => {
     }
   };
 
+  // Si la vigencia está vencida, solo muestra las tomas de signos vitales capturadas por este usuario
+  const registrosVisibles = vigenciaVencida
+    ? registros.filter((item) => item.uidcap === myuid)
+    : registros;
+
   if (cargando) return <div style={{ textAlign: 'center', marginTop: '50px' }}>Cargando signos vitales...</div>;
 
   return (
     <div className='sv-container'>
+      {vigenciaVencida && (
+        <div style={{
+          backgroundColor: '#fff3cd', color: '#856404', border: '1px solid #ffeeba',
+          borderRadius: '10px', padding: '12px 16px', marginBottom: '18px',
+          display: 'flex', alignItems: 'center', gap: '10px'
+        }}>
+          <FaLock />
+          <span>
+            <strong>Modo Solo Lectura (Vigencia Vencida):</strong> Solo se muestran los registros de signos vitales capturados por ti. No puedes agregar, editar ni eliminar información.
+          </span>
+        </div>
+      )}
+
       <div className='sv-header'>
         <Link to={`/px/${id}`} className='btn-regresar'>
           <FaArrowLeft /> Regresar al menú
@@ -329,24 +372,32 @@ const Sv = () => {
         <h2 className='sv-titulo'><LuHeartPulse /> Signos Vitales y Somatometría</h2>
       </div>
 
-      {registros.length === 0 ? (
+      {registrosVisibles.length === 0 ? (
         <div className='empty-state'>
           <LuHeartPulse className='empty-icon' />
-          <h3>Sin registros previos</h3>
-          <p>No hay tomas de signos vitales capturadas para este paciente.</p>
-          <button onClick={abrirModalNuevo} className='btn-agregar-main'>
-            <FaPlus /> Registrar Signos Vitales
-          </button>
+          <h3>{vigenciaVencida ? 'Sin registros propios de signos vitales' : 'Sin registros previos'}</h3>
+          <p>
+            {vigenciaVencida
+              ? 'Con vigencia vencida solo puedes visualizar registros que hayan sido capturados por ti.'
+              : 'No hay tomas de signos vitales capturadas para este paciente.'}
+          </p>
+          {!vigenciaVencida && (
+            <button onClick={abrirModalNuevo} className='btn-agregar-main'>
+              <FaPlus /> Registrar Signos Vitales
+            </button>
+          )}
         </div>
       ) : (
         <div className='lista-sv'>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '15px' }}>
-             <button onClick={abrirModalNuevo} className='btn-agregar-small'>
-               <FaPlus /> Nuevo Registro
-             </button>
-          </div>
+          {!vigenciaVencida && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '15px' }}>
+               <button onClick={abrirModalNuevo} className='btn-agregar-small'>
+                 <FaPlus /> Nuevo Registro
+               </button>
+            </div>
+          )}
 
-          {registros.map((item) => {
+          {registrosVisibles.map((item) => {
             const ev = evaluarSignosVitales(edadPx, item);
             const esAutor = item.uidcap === myuid;
 
@@ -378,8 +429,8 @@ const Sv = () => {
                     <FaEye /> Ver
                   </button>
 
-                  {/* SOLO EL USUARIO QUE LO AGREGÓ PUEDE EDITAR O ELIMINAR */}
-                  {esAutor && (
+                  {/* SOLO EL AUTOR CON VIGENCIA ACTIVA PUEDE EDITAR O ELIMINAR */}
+                  {esAutor && !vigenciaVencida && (
                     <>
                       <button onClick={() => abrirModalEditar(item, false)} className='btn-editar'>
                         <FaEdit /> Editar
@@ -471,7 +522,9 @@ const Sv = () => {
                 <span className="firma-sv">Capturó: {formData.firma || nombreCapturista}</span>
                 <div style={{display: 'flex', gap: '10px'}}>
                   <button type="button" onClick={() => setIsModalOpen(false)} className='btn-cancelar'>{isReadOnly ? 'Cerrar' : 'Cancelar'}</button>
-                  {!isReadOnly && <button type="submit" className='btn-guardar'><FaSave /> {isEditing ? 'Actualizar' : 'Guardar'}</button>}
+                  {!isReadOnly && !vigenciaVencida && (
+                    <button type="submit" className='btn-guardar'><FaSave /> {isEditing ? 'Actualizar' : 'Guardar'}</button>
+                  )}
                 </div>
               </div>
 

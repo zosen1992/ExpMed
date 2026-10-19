@@ -13,7 +13,7 @@ import { MdOutlineBloodtype } from "react-icons/md";
 import { FcInfo } from "react-icons/fc";
 import { 
     FaHome, FaPhoneAlt, FaEnvelope, FaMapMarkerAlt, 
-    FaBirthdayCake, FaSignOutAlt, FaUserMd, FaSyringe 
+    FaBirthdayCake, FaSignOutAlt, FaUserMd, FaSyringe, FaCalendarCheck 
 } from "react-icons/fa";
 import { MdOutlineBackspace } from "react-icons/md";
 
@@ -149,7 +149,9 @@ function Menupx() {
                     
                     <span className='px-age'>{edad} años</span>
 
-                    <div className='px-info-list'>
+                    <div className='px-info-list'> <Link to={`/mis-citas/${id}`} className='action-card'>
+                    <FaCalendarCheck className='action-icon text-primary'/><span className='action-title'>{esUsuarioPx ? 'Mis Citas' : 'Citas del Paciente'}</span>
+                    </Link>
                         <div className='px-info-item'><FaBirthdayCake className="info-icon"/> {paciente.fecha_nac || paciente.fechanacimiento || 'N/D'}</div>
                         <div className='px-info-item'><FaPhoneAlt className="info-icon"/> {paciente.num_cel || paciente.celular || 'Sin celular'}</div>
                         <div className='px-info-item'><FaEnvelope className="info-icon"/> <span className="truncate-text">{paciente.correo || 'Sin correo'}</span></div>

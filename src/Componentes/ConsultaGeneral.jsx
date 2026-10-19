@@ -5,10 +5,11 @@ import { ref, onValue, set, push, update, remove, get } from 'firebase/database'
 import { 
   FaArrowLeft, FaPlus, FaSearch, FaCalendarAlt, FaEraser, 
   FaEye, FaEdit, FaTrashAlt, FaTimes, FaSave, FaUserAlt, 
-  FaNotesMedical, FaHeartbeat, FaPills, FaPrint 
+  FaNotesMedical, FaHeartbeat, FaPills, FaPrint, FaLock 
 } from 'react-icons/fa';
 import { MdOutlineGroups } from 'react-icons/md';
 import ModalReceta from './ModalReceta';
+import { estaVigenciaVencida } from '../utilidades/verificadorVigencia';
 import '../Estilos/ConsultaGeneral.css';
 
 const ConsultaGeneral = () => {
@@ -18,6 +19,9 @@ const ConsultaGeneral = () => {
   const [cargando, setCargando] = useState(true);
   const [nombreMedico, setNombreMedico] = useState('');
   const [perfilMedico, setPerfilMedico] = useState({});
+  const [vigenciaVencida, setVigenciaVencida] = useState(
+    localStorage.getItem('vigenciaVencida') === 'true'
+  );
 
   const [busquedaNombre, setBusquedaNombre] = useState('');
   const [fechaInicio, setFechaInicio] = useState('');
@@ -50,20 +54,24 @@ const ConsultaGeneral = () => {
   useEffect(() => {
     if (!myuid) return;
 
-    // 1. Obtener datos completos del médico (nombre, cédulas, especialidades, consultorio)
+    // 1. Obtener datos completos del médico y validar su vigencia
     const cargarMedico = async () => {
       const snap = await get(ref(db, `usuarios/medico/${myuid}`));
       if (snap.exists()) {
         const data = snap.val();
         setPerfilMedico(data);
         setNombreMedico(data.nombre || data.nombrecom || 'Médico');
+
+        const vencida = estaVigenciaVencida(data.vigencia);
+        setVigenciaVencida(vencida);
+        localStorage.setItem('vigenciaVencida', vencida ? 'true' : 'false');
       } else {
         setNombreMedico(auth.currentUser?.email || 'Médico');
       }
     };
     cargarMedico();
 
-    // 2. Cargar consultas rápidas del médico
+    // 2. Cargar consultas rápidas creadas por este médico
     const cgRef = ref(db, `consultageneral/${myuid}`);
     const unsubscribe = onValue(cgRef, (snapshot) => {
       if (snapshot.exists()) {
@@ -84,7 +92,7 @@ const ConsultaGeneral = () => {
 
   // Armar el objeto de Receta y abrir la vista previa
   const abrirVistaPreviaReceta = (item) => {
-const listaEsp = [];
+    const listaEsp = [];
     if (perfilMedico.especialidad1) {
       listaEsp.push({
         nombre: perfilMedico.especialidad1,
@@ -146,6 +154,9 @@ const listaEsp = [];
   };
 
   const abrirModalNuevo = () => {
+    if (vigenciaVencida) {
+      return alert("⛔ Modo de solo lectura: Tu vigencia está vencida y no puedes crear nuevas notas rápidas.");
+    }
     setIsEditing(false);
     setIsReadOnly(false);
     setEditId(null);
@@ -171,6 +182,10 @@ const listaEsp = [];
     if (item.uidMedico !== myuid) {
       return alert("Acceso denegado: Solo el médico que creó esta nota puede visualizarla o editarla.");
     }
+    if (vigenciaVencida) {
+      modoLectura = true;
+    }
+
     setIsEditing(!modoLectura);
     setIsReadOnly(modoLectura);
     setEditId(item.id);
@@ -200,6 +215,9 @@ const listaEsp = [];
   const handleGuardar = async (e) => {
     e.preventDefault();
     if (!myuid) return alert("Error: Sesión no válida.");
+    if (vigenciaVencida) {
+      return alert("⛔ Acción bloqueada: Tu cuenta está en modo solo lectura por vigencia vencida.");
+    }
 
     try {
       const ahora = new Date();
@@ -236,6 +254,9 @@ const listaEsp = [];
   };
 
   const handleEliminar = async (item) => {
+    if (vigenciaVencida) {
+      return alert("⛔ Acción bloqueada: No puedes eliminar notas con vigencia vencida.");
+    }
     if (item.uidMedico !== myuid) return;
     if (window.confirm(`¿Deseas eliminar permanentemente la nota rápida de "${item.nombrePx}"?`)) {
       try {
@@ -269,6 +290,20 @@ const listaEsp = [];
   return (
     <div className='cg-container'>
       
+      {/* BANNER DE VIGENCIA VENCIDA */}
+      {vigenciaVencida && (
+        <div style={{
+          backgroundColor: '#fff3cd', color: '#856404', border: '1px solid #ffeeba',
+          borderRadius: '10px', padding: '12px 16px', marginBottom: '18px',
+          display: 'flex', alignItems: 'center', gap: '10px'
+        }}>
+          <FaLock />
+          <span>
+            <strong>Modo Solo Lectura (Vigencia Vencida):</strong> Solo puedes consultar tus notas rápidas previas. No está permitido crear, editar ni eliminar registros.
+          </span>
+        </div>
+      )}
+
       {/* CABECERA */}
       <div className='cg-header'>
         <Link to="/" className='btn-regresar-cg'>
@@ -281,9 +316,11 @@ const listaEsp = [];
             <p className='cg-subtitulo'>Atención ambulatoria sin apertura de expediente • Visible únicamente para ti</p>
           </div>
 
-          <button onClick={abrirModalNuevo} className='btn-nueva-cg'>
-            <FaPlus /> Nueva Nota Rápida
-          </button>
+          {!vigenciaVencida && (
+            <button onClick={abrirModalNuevo} className='btn-nueva-cg'>
+              <FaPlus /> Nueva Nota Rápida
+            </button>
+          )}
         </div>
       </div>
 
@@ -325,10 +362,16 @@ const listaEsp = [];
         <div className='cg-empty'>
           <FaNotesMedical className='cg-empty-icon' />
           <h3>No tienes notas médicas rápidas registradas</h3>
-          <p>Utiliza este espacio para registrar consultas de primera vez o ambulatorias que no requieren seguimiento en expediente.</p>
-          <button onClick={abrirModalNuevo} className='btn-nueva-cg' style={{ margin: '15px auto 0 auto' }}>
-            <FaPlus /> Crear Primera Nota Rápida
-          </button>
+          <p>
+            {vigenciaVencida
+              ? 'Con vigencia vencida no puedes registrar nuevas notas médicas rápidas.'
+              : 'Utiliza este espacio para registrar consultas de primera vez o ambulatorias que no requieren seguimiento en expediente.'}
+          </p>
+          {!vigenciaVencida && (
+            <button onClick={abrirModalNuevo} className='btn-nueva-cg' style={{ margin: '15px auto 0 auto' }}>
+              <FaPlus /> Crear Primera Nota Rápida
+            </button>
+          )}
         </div>
       ) : consultasFiltradas.length === 0 ? (
         <div className='cg-empty'>
@@ -378,7 +421,6 @@ const listaEsp = [];
                 </button>
                 
                 {/* BOTÓN PARA IMPRIMIR PLAN / RECETA */}
-
                 <button 
                   onClick={() => abrirVistaPreviaReceta(item)} 
                   className='btn-cg-act'
@@ -388,12 +430,16 @@ const listaEsp = [];
                   <FaPrint /> Imprimir Plan
                 </button>
 
-                <button onClick={() => abrirModalRegistro(item, false)} className='btn-cg-act btn-cg-edit'>
-                  <FaEdit /> Editar
-                </button>
-                <button onClick={() => handleEliminar(item)} className='btn-cg-act btn-cg-del'>
-                  <FaTrashAlt /> Eliminar
-                </button>
+                {!vigenciaVencida && (
+                  <>
+                    <button onClick={() => abrirModalRegistro(item, false)} className='btn-cg-act btn-cg-edit'>
+                      <FaEdit /> Editar
+                    </button>
+                    <button onClick={() => handleEliminar(item)} className='btn-cg-act btn-cg-del'>
+                      <FaTrashAlt /> Eliminar
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           ))}
@@ -482,7 +528,7 @@ const listaEsp = [];
                 <button type="button" onClick={() => setIsModalOpen(false)} className='btn-cg-cancel'>
                   {isReadOnly ? 'Cerrar' : 'Cancelar'}
                 </button>
-                {!isReadOnly && (
+                {!isReadOnly && !vigenciaVencida && (
                   <button type="submit" className='btn-cg-save'>
                     <FaSave /> {isEditing ? 'Actualizar Nota' : 'Guardar Nota Rápida'}
                   </button>

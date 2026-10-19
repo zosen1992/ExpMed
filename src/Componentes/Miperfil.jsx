@@ -6,9 +6,10 @@ import {
   FaArrowLeft, FaUserEdit, FaSave, FaEnvelope, 
   FaPhoneAlt, FaMapMarkerAlt, FaIdBadge, FaCalendarCheck, 
   FaCamera, FaUserMd, FaUserNurse, FaGraduationCap,
-  FaEye, FaEyeSlash, FaStar, FaUniversity, FaSignature, FaTrashAlt, FaUpload
+  FaEye, FaEyeSlash, FaStar, FaUniversity, FaSignature, FaTrashAlt, FaUpload, FaLock
 } from 'react-icons/fa';
 import { ESTADOS_REPUBLICA } from '../constantes/estados';
+import { estaVigenciaVencida } from '../utilidades/verificadorVigencia';
 import '../Estilos/Miperfil.css';
 
 const Miperfil = () => {
@@ -19,6 +20,9 @@ const Miperfil = () => {
   const [guardando, setGuardando] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [ramaEncontrada, setRamaEncontrada] = useState('');
+  const [vigenciaVencida, setVigenciaVencida] = useState(
+    localStorage.getItem('vigenciaVencida') === 'true'
+  );
 
   const [formData, setFormData] = useState({
     nombre: '',
@@ -90,6 +94,25 @@ const Miperfil = () => {
           if (snapshot.exists()) {
             const data = snapshot.val();
             const esOculto = data.oculto === true || data.visibilidad === 'oculto';
+
+            // Evaluar si la vigencia está vencida (para Médico y Enfermería)
+            const rolEval = String(data.rol || ramaDetectada).toLowerCase();
+            const aplicaVigencia = 
+              ramaDetectada === 'medico' || 
+              ramaDetectada === 'enfermeria' || 
+              ramaDetectada === 'enfermero' || 
+              ramaDetectada === 'enfemero' || 
+              rolEval === 'medico' || 
+              rolEval.includes('enfermer');
+
+            if (aplicaVigencia) {
+              const vencida = estaVigenciaVencida(data.vigencia);
+              setVigenciaVencida(vencida);
+              localStorage.setItem('vigenciaVencida', vencida ? 'true' : 'false');
+              if (vencida) setEditMode(false);
+            } else {
+              setVigenciaVencida(false);
+            }
 
             // Consultar también las carpetas dedicadas fotoperfil/[uid] y fimas/[uid]
             let fotoGuardada = data.fotoperfil || '';
@@ -174,7 +197,6 @@ const Miperfil = () => {
     }
   };
 
-  // Procesador de imágenes para Foto de Perfil (solo permite archivos de imagen)
   const handleSubirImagenFotoPerfil = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -213,7 +235,6 @@ const Miperfil = () => {
     reader.readAsDataURL(file);
   };
 
-  // Procesador de imágenes para Firma (solo permite archivos de imagen)
   const handleSubirImagenFirma = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -254,6 +275,9 @@ const Miperfil = () => {
   };
 
   const toggleVisibilidadRapida = async () => {
+    if (vigenciaVencida) {
+      return alert("⛔ Modo de solo lectura: Tu vigencia está vencida y no puedes modificar tu perfil.");
+    }
     if (!ramaEncontrada || !targetUid) return;
     const nuevoOculto = !formData.oculto;
     const nuevaVisibilidad = nuevoOculto ? 'oculto' : 'publico';
@@ -269,6 +293,9 @@ const Miperfil = () => {
 
   const handleGuardar = async (e) => {
     e.preventDefault();
+    if (vigenciaVencida) {
+      return alert("⛔ Acción bloqueada: Tu vigencia está vencida y no puedes editar información.");
+    }
     if (!ramaEncontrada || !targetUid) {
       return alert("Error: No se encontró la ruta del perfil para actualizar.");
     }
@@ -287,7 +314,7 @@ const Miperfil = () => {
         recibirNotificaciones: Boolean(formData.recibirNotificaciones)
       };
 
-      // 1. Guardar la Foto de Perfil en la carpeta/ruta "fotoperfil/[uid]" con el UID como nombre
+      // 1. Guardar la Foto de Perfil en la carpeta/ruta "fotoperfil/[uid]"
       await set(ref(db, `fotoperfil/${targetUid}`), {
         uid: targetUid,
         nombreArchivo: `${targetUid}.png`,
@@ -310,7 +337,7 @@ const Miperfil = () => {
         datosActualizar.universidad_esp3 = formData.universidad_esp3;
         datosActualizar.firma = formData.firma || '';
 
-        // 2. Guardar la Firma en la carpeta/ruta correspondiente "fimas/[uid]" (y "firmas/[uid]") con el UID como nombre
+        // 2. Guardar la Firma en "fimas/[uid]" y "firmas/[uid]"
         const objetoFirma = {
           uid: targetUid,
           nombreArchivo: `${targetUid}.png`,
@@ -361,13 +388,27 @@ const Miperfil = () => {
   return (
     <div className='miperfil-container'>
       
+      {/* BANNER DE VIGENCIA VENCIDA */}
+      {vigenciaVencida && (
+        <div style={{
+          backgroundColor: '#fff3cd', color: '#856404', border: '1px solid #ffeeba',
+          borderRadius: '10px', padding: '12px 16px', marginBottom: '18px',
+          display: 'flex', alignItems: 'center', gap: '10px'
+        }}>
+          <FaLock />
+          <span>
+            <strong>Vigencia Vencida ({formData.vigencia}):</strong> Tu perfil se encuentra en modo solo lectura. Contacta al Administrador para renovar tu vigencia y habilitar la edición.
+          </span>
+        </div>
+      )}
+
       {/* HEADER */}
       <div className='miperfil-header'>
         <Link to="/" className='btn-regresar-perfil'>
           <FaArrowLeft /> Volver al Panel de Control
         </Link>
 
-        {!editMode && (
+        {!editMode && !vigenciaVencida && (
           <button onClick={() => setEditMode(true)} className='btn-editar-perfil'>
             <FaUserEdit /> Editar Mi Información
           </button>
@@ -404,8 +445,8 @@ const Miperfil = () => {
               <span className='badge-rol'>
                 <FaIdBadge /> Rol: {formData.rol}
               </span>
-              <span className='badge-vigencia'>
-                <FaCalendarCheck /> Vigencia: {formData.vigencia}
+              <span className='badge-vigencia' style={vigenciaVencida ? { backgroundColor: '#fee2e2', color: '#991b1b' } : {}}>
+                <FaCalendarCheck /> Vigencia: {formData.vigencia} {vigenciaVencida ? '(Vencida)' : ''}
               </span>
               <span className='badge-ruta'>
                 Ruta: usuarios/{ramaEncontrada}
@@ -414,6 +455,8 @@ const Miperfil = () => {
               <button 
                 type="button" 
                 onClick={toggleVisibilidadRapida} 
+                disabled={vigenciaVencida}
+                style={vigenciaVencida ? { opacity: 0.65, cursor: 'not-allowed' } : {}}
                 className={`badge-visibilidad-btn ${formData.oculto ? 'estado-oculto' : 'estado-publico'}`}
               >
                 {formData.oculto ? (
@@ -440,8 +483,8 @@ const Miperfil = () => {
                 name="visibilidad"
                 value={formData.visibilidad}
                 onChange={handleChange}
-                disabled={!editMode}
-                className={!editMode ? 'input-locked' : ''}
+                disabled={!editMode || vigenciaVencida}
+                className={(!editMode || vigenciaVencida) ? 'input-locked' : ''}
               >
                 <option value="publico">Público (Visible para otros usuarios)</option>
                 <option value="oculto">Ocultar a otros (Privado)</option>
@@ -456,8 +499,8 @@ const Miperfil = () => {
                   name="recibirNotificaciones" 
                   checked={formData.recibirNotificaciones} 
                   onChange={(e) => setFormData({ ...formData, recibirNotificaciones: e.target.checked })}
-                  disabled={!editMode}
-                  style={{ width: '20px', height: '20px', cursor: editMode ? 'pointer' : 'default' }}
+                  disabled={!editMode || vigenciaVencida}
+                  style={{ width: '20px', height: '20px', cursor: (editMode && !vigenciaVencida) ? 'pointer' : 'default' }}
                 />
                 <span style={{ fontSize: '0.9rem', color: formData.recibirNotificaciones ? '#27ae60' : '#7f8c8d', fontWeight: 600 }}>
                   {formData.recibirNotificaciones ? 'Activadas (Recibir alertas)' : 'Desactivadas (Silenciado)'}
@@ -477,8 +520,8 @@ const Miperfil = () => {
                 name="nombre" 
                 value={formData.nombre} 
                 onChange={handleChange} 
-                readOnly={!editMode}
-                className={!editMode ? 'input-locked' : ''}
+                readOnly={!editMode || vigenciaVencida}
+                className={(!editMode || vigenciaVencida) ? 'input-locked' : ''}
                 required
               />
             </div>
@@ -501,8 +544,8 @@ const Miperfil = () => {
                 name="num_cel" 
                 value={formData.num_cel} 
                 onChange={handleChange} 
-                readOnly={!editMode}
-                className={!editMode ? 'input-locked' : ''}
+                readOnly={!editMode || vigenciaVencida}
+                className={(!editMode || vigenciaVencida) ? 'input-locked' : ''}
               />
             </div>
 
@@ -513,8 +556,8 @@ const Miperfil = () => {
                 name="direccion" 
                 value={formData.direccion} 
                 onChange={handleChange} 
-                readOnly={!editMode}
-                className={!editMode ? 'input-locked' : ''}
+                readOnly={!editMode || vigenciaVencida}
+                className={(!editMode || vigenciaVencida) ? 'input-locked' : ''}
               />
             </div>
 
@@ -524,8 +567,8 @@ const Miperfil = () => {
                 name="localidad"
                 value={formData.localidad}
                 onChange={handleChange}
-                disabled={!editMode}
-                className={!editMode ? 'input-locked' : ''}
+                disabled={!editMode || vigenciaVencida}
+                className={(!editMode || vigenciaVencida) ? 'input-locked' : ''}
               >
                 <option value="">Seleccione un estado...</option>
                 {ESTADOS_REPUBLICA.map((estado) => (
@@ -544,11 +587,11 @@ const Miperfil = () => {
               />
             </div>
 
-            {/* SECCIÓN DE FOTO DE PERFIL (ARCHIVO O URL, GUARDADO EN fotoperfil/[uid]) */}
+            {/* SECCIÓN DE FOTO DE PERFIL */}
             <div className='perfil-field field-full' style={{ marginTop: '10px' }}>
               <label><FaCamera /> Foto de Perfil (Ruta: <code>fotoperfil/{targetUid}</code>)</label>
               
-              {editMode && (
+              {editMode && !vigenciaVencida && (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center', marginBottom: '10px' }}>
                   <label style={{
                     backgroundColor: '#3498db', color: '#fff', padding: '9px 16px',
@@ -609,9 +652,7 @@ const Miperfil = () => {
 
           </div>
 
-          {/* ===================================================================================
-              SECCIÓN EXCLUSIVA PARA MÉDICO (Cédulas, Especialidades, Universidades y FIRMA)
-             =================================================================================== */}
+          {/* SECCIÓN EXCLUSIVA PARA MÉDICO */}
           {esMedico && (
             <>
               <h4 className='perfil-section-title' style={{ marginTop: '30px' }}>
@@ -626,9 +667,9 @@ const Miperfil = () => {
                     name="cedula_partero" 
                     value={formData.cedula_partero} 
                     onChange={handleChange} 
-                    readOnly={!editMode}
+                    readOnly={!editMode || vigenciaVencida}
                     placeholder="Cédula de Médico Partero"
-                    className={!editMode ? 'input-locked' : ''}
+                    className={(!editMode || vigenciaVencida) ? 'input-locked' : ''}
                   />
                 </div>
 
@@ -639,9 +680,9 @@ const Miperfil = () => {
                     name="universidad" 
                     value={formData.universidad} 
                     onChange={handleChange} 
-                    readOnly={!editMode}
+                    readOnly={!editMode || vigenciaVencida}
                     placeholder="Ej. UANL, UNAM, ITESM..."
-                    className={!editMode ? 'input-locked' : ''}
+                    className={(!editMode || vigenciaVencida) ? 'input-locked' : ''}
                   />
                 </div>
 
@@ -653,9 +694,9 @@ const Miperfil = () => {
                     name="especialidad1" 
                     value={formData.especialidad1} 
                     onChange={handleChange} 
-                    readOnly={!editMode}
+                    readOnly={!editMode || vigenciaVencida}
                     placeholder="Ej. Cardiología, Pediatría..."
-                    className={!editMode ? 'input-locked' : ''}
+                    className={(!editMode || vigenciaVencida) ? 'input-locked' : ''}
                   />
                 </div>
                 <div className='perfil-field'>
@@ -665,9 +706,9 @@ const Miperfil = () => {
                     name="cedula_esp1" 
                     value={formData.cedula_esp1} 
                     onChange={handleChange} 
-                    readOnly={!editMode}
+                    readOnly={!editMode || vigenciaVencida}
                     placeholder="Número de cédula esp. 1"
-                    className={!editMode ? 'input-locked' : ''}
+                    className={(!editMode || vigenciaVencida) ? 'input-locked' : ''}
                   />
                 </div>
                 <div className='perfil-field field-full'>
@@ -677,9 +718,9 @@ const Miperfil = () => {
                     name="universidad_esp1" 
                     value={formData.universidad_esp1} 
                     onChange={handleChange} 
-                    readOnly={!editMode}
+                    readOnly={!editMode || vigenciaVencida}
                     placeholder="Institución que avala la Especialidad 1"
-                    className={!editMode ? 'input-locked' : ''}
+                    className={(!editMode || vigenciaVencida) ? 'input-locked' : ''}
                   />
                 </div>
 
@@ -691,9 +732,9 @@ const Miperfil = () => {
                     name="especialidad2" 
                     value={formData.especialidad2} 
                     onChange={handleChange} 
-                    readOnly={!editMode}
+                    readOnly={!editMode || vigenciaVencida}
                     placeholder="Opcional - Segunda especialidad"
-                    className={!editMode ? 'input-locked' : ''}
+                    className={(!editMode || vigenciaVencida) ? 'input-locked' : ''}
                   />
                 </div>
                 <div className='perfil-field'>
@@ -703,9 +744,9 @@ const Miperfil = () => {
                     name="cedula_esp2" 
                     value={formData.cedula_esp2} 
                     onChange={handleChange} 
-                    readOnly={!editMode}
+                    readOnly={!editMode || vigenciaVencida}
                     placeholder="Número de cédula esp. 2"
-                    className={!editMode ? 'input-locked' : ''}
+                    className={(!editMode || vigenciaVencida) ? 'input-locked' : ''}
                   />
                 </div>
                 <div className='perfil-field field-full'>
@@ -715,9 +756,9 @@ const Miperfil = () => {
                     name="universidad_esp2" 
                     value={formData.universidad_esp2} 
                     onChange={handleChange} 
-                    readOnly={!editMode}
+                    readOnly={!editMode || vigenciaVencida}
                     placeholder="Institución que avala la Especialidad 2"
-                    className={!editMode ? 'input-locked' : ''}
+                    className={(!editMode || vigenciaVencida) ? 'input-locked' : ''}
                   />
                 </div>
 
@@ -729,9 +770,9 @@ const Miperfil = () => {
                     name="especialidad3" 
                     value={formData.especialidad3} 
                     onChange={handleChange} 
-                    readOnly={!editMode}
+                    readOnly={!editMode || vigenciaVencida}
                     placeholder="Opcional - Tercera especialidad / Subespecialidad"
-                    className={!editMode ? 'input-locked' : ''}
+                    className={(!editMode || vigenciaVencida) ? 'input-locked' : ''}
                   />
                 </div>
                 <div className='perfil-field'>
@@ -741,9 +782,9 @@ const Miperfil = () => {
                     name="cedula_esp3" 
                     value={formData.cedula_esp3} 
                     onChange={handleChange} 
-                    readOnly={!editMode}
+                    readOnly={!editMode || vigenciaVencida}
                     placeholder="Número de cédula esp. 3"
-                    className={!editMode ? 'input-locked' : ''}
+                    className={(!editMode || vigenciaVencida) ? 'input-locked' : ''}
                   />
                 </div>
                 <div className='perfil-field field-full'>
@@ -753,17 +794,17 @@ const Miperfil = () => {
                     name="universidad_esp3" 
                     value={formData.universidad_esp3} 
                     onChange={handleChange} 
-                    readOnly={!editMode}
+                    readOnly={!editMode || vigenciaVencida}
                     placeholder="Institución que avala la Especialidad 3"
-                    className={!editMode ? 'input-locked' : ''}
+                    className={(!editMode || vigenciaVencida) ? 'input-locked' : ''}
                   />
                 </div>
 
-                {/* CAMPO DE FIRMA DEL MÉDICO (GUARDADO EN fimas/[uid]) */}
+                {/* CAMPO DE FIRMA DEL MÉDICO */}
                 <div className='perfil-field field-full' style={{ marginTop: '10px' }}>
                   <label><FaSignature /> Firma del Médico (Ruta: <code>fimas/{targetUid}</code>)</label>
                   
-                  {editMode && (
+                  {editMode && !vigenciaVencida && (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center', marginBottom: '10px' }}>
                       <label style={{
                         backgroundColor: '#3498db', color: '#fff', padding: '9px 16px',
@@ -822,7 +863,7 @@ const Miperfil = () => {
                       </>
                     ) : (
                       <span style={{ color: '#94a3b8', fontSize: '0.9rem' }}>
-                        Sin imagen de firma registrada. {editMode ? 'Sube una imagen con fondo transparente o blanco.' : 'Haz clic en "Editar Mi Información" para agregar tu firma.'}
+                        Sin imagen de firma registrada. {(editMode && !vigenciaVencida) ? 'Sube una imagen con fondo transparente o blanco.' : ''}
                       </span>
                     )}
                   </div>
@@ -846,9 +887,9 @@ const Miperfil = () => {
                     name="cedula" 
                     value={formData.cedula} 
                     onChange={handleChange} 
-                    readOnly={!editMode}
+                    readOnly={!editMode || vigenciaVencida}
                     placeholder="Número de cédula profesional"
-                    className={!editMode ? 'input-locked' : ''}
+                    className={(!editMode || vigenciaVencida) ? 'input-locked' : ''}
                   />
                 </div>
 
@@ -859,16 +900,16 @@ const Miperfil = () => {
                     name="especialidad_enf" 
                     value={formData.especialidad_enf} 
                     onChange={handleChange} 
-                    readOnly={!editMode}
+                    readOnly={!editMode || vigenciaVencida}
                     placeholder="Ej. Enfermería Quirúrgica, Cuidados Intensivos..."
-                    className={!editMode ? 'input-locked' : ''}
+                    className={(!editMode || vigenciaVencida) ? 'input-locked' : ''}
                   />
                 </div>
               </div>
             </>
           )}
 
-          {editMode && (
+          {editMode && !vigenciaVencida && (
             <div className='miperfil-actions'>
               <button 
                 type="button" 

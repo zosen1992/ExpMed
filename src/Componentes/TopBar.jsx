@@ -247,12 +247,12 @@ const TopBar = () => {
     }
   }, [navigate]);
 
-  const obtenerRutaDeNotificacion = (item) => {
-    if (item.tipoNotif === 'VIGENCIA') {
-      return item.rutaDestino || '/notificaciones';
-    }
-    return `/sv/${item.uidPx}`;
-  };
+const obtenerRutaDeNotificacion = (item) => {
+  if (item.tipoNotif === 'VIGENCIA' || item.tipoNotif === 'CITA') {
+    return item.rutaDestino || '/notificaciones';
+  }
+  return `/sv/${item.uidPx}`;
+};
 
   const lanzarNotificacionSistema = async (item) => {
     if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
@@ -349,6 +349,7 @@ const TopBar = () => {
     if (!user || sessionStorage.getItem('validandoRolLogin') === 'true') {
       setUserInfo(null);
       setCurrentUid(null);
+      verificarCitasDeUsuario(user.uid, rolActivo);
       return;
     }
 

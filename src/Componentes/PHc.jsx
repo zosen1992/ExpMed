@@ -2,33 +2,28 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { auth, db } from '../firebase';
 import { ref, onValue, set, push, update } from 'firebase/database';
-import { FaArrowLeft, FaPlus, FaEdit, FaTimes, FaSave, FaEye } from 'react-icons/fa';
+import { FaArrowLeft, FaPlus, FaEdit, FaTimes, FaSave, FaEye, FaLock } from 'react-icons/fa';
 import { GiBookPile } from "react-icons/gi";
+import { estaVigenciaVencida } from '../utilidades/verificadorVigencia';
 import '../Estilos/PHc.css';
 
 const PHc = () => {
   const { id } = useParams(); // UID del paciente
   const myuid = auth.currentUser?.uid; // UID del médico
 
-  const vigenciaVencida = localStorage.getItem('vigenciaVencida') === 'true';
-  // Filtra por el campo donde guardas el UID del autor (uidg / uidMedico / uidAutor)
-const listaVisible = vigenciaVencida 
-  ? registros.filter(item => (item.uidg || item.uidMedico || item.uid) === myuid)
-  : registros;
-
   const [historias, setHistorias] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [nombreMedico, setNombreMedico] = useState("");
+  const [vigenciaVencida, setVigenciaVencida] = useState(
+    localStorage.getItem('vigenciaVencida') === 'true'
+  );
 
   // Estados del Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editPid, setEditPid] = useState(null);
-  
-  // Estado para solo lectura
   const [isReadOnly, setIsReadOnly] = useState(false);
 
-  // Formulario clínico estándar
   const [formData, setFormData] = useState({
     ahf: '',
     app: '',
@@ -41,7 +36,13 @@ const listaVisible = vigenciaVencida
     if (myuid) {
       const medicoRef = ref(db, `usuarios/medico/${myuid}`);
       const unsubscribeMedico = onValue(medicoRef, (snapshot) => {
-        if (snapshot.exists()) setNombreMedico(snapshot.val().nombre);
+        if (snapshot.exists()) {
+          const data = snapshot.val();
+          setNombreMedico(data.nombre || data.nombrecom || "");
+          const vencida = estaVigenciaVencida(data.vigencia);
+          setVigenciaVencida(vencida);
+          localStorage.setItem('vigenciaVencida', vencida ? 'true' : 'false');
+        }
       });
 
       if (id) {
@@ -52,7 +53,7 @@ const listaVisible = vigenciaVencida
             const historiasArray = Object.keys(data).map(key => ({
               pid: key,
               ...data[key]
-            })).reverse(); // Invertimos para ver la más reciente primero
+            })).reverse();
             setHistorias(historiasArray);
           } else {
             setHistorias([]);
@@ -73,6 +74,9 @@ const listaVisible = vigenciaVencida
   };
 
   const abrirModalNuevo = () => {
+    if (vigenciaVencida) {
+      return alert("⛔ Modo de solo lectura: Tu vigencia está vencida y no puedes crear historias clínicas.");
+    }
     setIsEditing(false);
     setIsReadOnly(false);
     setEditPid(null);
@@ -81,6 +85,17 @@ const listaVisible = vigenciaVencida
   };
 
   const abrirModalEditar = (item, readOnly = false) => {
+    if (vigenciaVencida) {
+      if (item.uidcap !== myuid) {
+        return alert("Con vigencia vencida solo puedes visualizar historias clínicas creadas por ti.");
+      }
+      readOnly = true;
+    }
+
+    if (!readOnly && item.uidcap !== myuid) {
+      return alert("Acceso denegado: Solo el médico que creó esta historia clínica puede editarla.");
+    }
+
     setIsEditing(!readOnly);
     setIsReadOnly(readOnly);
     setEditPid(item.pid);
@@ -89,7 +104,7 @@ const listaVisible = vigenciaVencida
       app: item.app || '',
       apnp: item.apnp || '',
       ago: item.ago || '',
-      firma: readOnly ? item.firma : nombreMedico // Si es lectura, muestra el original. Si edita, sella el actual.
+      firma: readOnly ? item.firma : nombreMedico
     });
     setIsModalOpen(true);
   };
@@ -97,6 +112,9 @@ const listaVisible = vigenciaVencida
   const handleGuardar = async (e) => {
     e.preventDefault();
     if (!myuid) return alert("Error: Sesión no válida.");
+    if (vigenciaVencida) {
+      return alert("⛔ Acción bloqueada: Tu cuenta está en modo solo lectura por vigencia vencida.");
+    }
 
     try {
       const fechaActual = new Date().toLocaleString('es-MX', { 
@@ -139,10 +157,28 @@ const listaVisible = vigenciaVencida
     }
   };
 
+  // Si la vigencia está vencida, solo muestra las historias clínicas creadas por este médico
+  const historiasVisibles = vigenciaVencida
+    ? historias.filter((item) => item.uidcap === myuid)
+    : historias;
+
   if (cargando) return <div style={{ textAlign: 'center', marginTop: '50px' }}>Cargando expediente clínico...</div>;
 
   return (
     <div className='hc-container'>
+      {vigenciaVencida && (
+        <div style={{
+          backgroundColor: '#fff3cd', color: '#856404', border: '1px solid #ffeeba',
+          borderRadius: '10px', padding: '12px 16px', marginBottom: '18px',
+          display: 'flex', alignItems: 'center', gap: '10px'
+        }}>
+          <FaLock />
+          <span>
+            <strong>Modo Solo Lectura (Vigencia Vencida):</strong> Solo se muestran las historias clínicas creadas por ti. No puedes agregar ni editar información.
+          </span>
+        </div>
+      )}
+
       <div className='hc-header'>
         <Link to={`/px/${id}`} className='btn-regresar'>
           <FaArrowLeft /> Regresar al menú
@@ -150,43 +186,56 @@ const listaVisible = vigenciaVencida
         <h2 className='hc-titulo'><GiBookPile /> Historias Clínicas</h2>
       </div>
 
-      {historias.length === 0 ? (
+      {historiasVisibles.length === 0 ? (
         <div className='empty-state'>
           <GiBookPile className='empty-icon' />
-          <h3>Sin Historia Clínica</h3>
-          <p>Es importante realizar el interrogatorio de antecedentes del paciente.</p>
-          <button onClick={abrirModalNuevo} className='btn-agregar-main'>
-            <FaPlus /> Crear Historia Clínica
-          </button>
+          <h3>{vigenciaVencida ? 'Sin Historias Clínicas propias' : 'Sin Historia Clínica'}</h3>
+          <p>
+            {vigenciaVencida
+              ? 'Con vigencia vencida solo puedes consultar evaluaciones que hayan sido registradas por ti.'
+              : 'Es importante realizar el interrogatorio de antecedentes del paciente.'}
+          </p>
+          {!vigenciaVencida && (
+            <button onClick={abrirModalNuevo} className='btn-agregar-main'>
+              <FaPlus /> Crear Historia Clínica
+            </button>
+          )}
         </div>
       ) : (
         <div className='lista-hc'>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '15px' }}>
-             <button onClick={abrirModalNuevo} className='btn-agregar-small'>
-               <FaPlus /> Nueva Evaluación
-             </button>
-          </div>
-
-          {historias.map((item) => (
-            <div key={item.pid} className='hc-card'>
-              <div className='hc-info'>
-                <h4 className='hc-fecha'>Evaluación del: {item.fecha}</h4>
-                <p className='hc-resumen'>
-                  <strong>AHF:</strong> {item.ahf ? item.ahf.substring(0, 50) + '...' : 'N/D'}
-                </p>
-                <p className='hc-firma'><strong>Médico:</strong> {item.firma}</p>
-                {item.ultimaModificacion && <span className='hc-modificado'>Modificado: {item.ultimaModificacion}</span>}
-              </div>
-              <div className='hc-acciones'>
-                <button onClick={() => abrirModalEditar(item, true)} className='btn-ver'>
-                  <FaEye /> Ver
-                </button>
-                <button onClick={() => abrirModalEditar(item, false)} className='btn-editar'>
-                  <FaEdit /> Editar
-                </button>
-              </div>
+          {!vigenciaVencida && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '15px' }}>
+               <button onClick={abrirModalNuevo} className='btn-agregar-small'>
+                 <FaPlus /> Nueva Evaluación
+               </button>
             </div>
-          ))}
+          )}
+
+          {historiasVisibles.map((item) => {
+            const esAutor = item.uidcap === myuid;
+            return (
+              <div key={item.pid} className='hc-card'>
+                <div className='hc-info'>
+                  <h4 className='hc-fecha'>Evaluación del: {item.fecha}</h4>
+                  <p className='hc-resumen'>
+                    <strong>AHF:</strong> {item.ahf ? item.ahf.substring(0, 50) + '...' : 'N/D'}
+                  </p>
+                  <p className='hc-firma'><strong>Médico:</strong> {item.firma}</p>
+                  {item.ultimaModificacion && <span className='hc-modificado'>Modificado: {item.ultimaModificacion}</span>}
+                </div>
+                <div className='hc-acciones'>
+                  <button onClick={() => abrirModalEditar(item, true)} className='btn-ver'>
+                    <FaEye /> Ver
+                  </button>
+                  {esAutor && !vigenciaVencida && (
+                    <button onClick={() => abrirModalEditar(item, false)} className='btn-editar'>
+                      <FaEdit /> Editar
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -268,7 +317,7 @@ const listaVisible = vigenciaVencida
                 <button type="button" onClick={() => setIsModalOpen(false)} className='btn-cancelar'>
                   {isReadOnly ? 'Cerrar' : 'Cancelar'}
                 </button>
-                {!isReadOnly && (
+                {!isReadOnly && !vigenciaVencida && (
                   <button type="submit" className='btn-guardar'><FaSave /> {isEditing ? 'Actualizar' : 'Guardar'}</button>
                 )}
               </div>

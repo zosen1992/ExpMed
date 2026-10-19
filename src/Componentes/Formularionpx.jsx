@@ -7,18 +7,20 @@ import { ref, set, push, get } from 'firebase/database';
 import { FaArrowLeft, FaSave, FaLock } from 'react-icons/fa';
 import { ESTADOS_REPUBLICA } from '../constantes/estados';
 
-useEffect(() => {
-    if (localStorage.getItem('vigenciaVencida') === 'true') {
-      alert("⛔ Tu vigencia ha vencido. No puedes registrar pacientes nuevos.");
-      navigate('/listapx', { replace: true });
-    }
-  }, [navigate]);
 
 const PASSWORD_DEFAULT = "000000";
 
 const Formularionpx = () => {
   const navigate = useNavigate();
   const myuid = auth.currentUser?.uid;
+
+  useEffect(() => {
+    if (localStorage.getItem('vigenciaVencida') === 'true') {
+      alert("⛔ Tu vigencia ha vencido. No puedes registrar pacientes nuevos.");
+      navigate('/listapx', { replace: true });
+    }
+  }, [navigate]);
+
 
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({

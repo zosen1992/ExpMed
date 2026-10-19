@@ -1,0 +1,490 @@
+.agenda-container {
+  max-width: 1120px;
+  margin: 28px auto;
+  padding: 0 20px;
+  font-family: 'Segoe UI', Roboto, sans-serif;
+}
+
+.agenda-banner-vencido {
+  background-color: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeeba;
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.agenda-header {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.btn-regresar-agenda {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #3498db;
+  text-decoration: none;
+  font-weight: 600;
+  align-self: flex-start;
+  padding: 7px 14px;
+  background-color: #e8f4fd;
+  border-radius: 8px;
+}
+
+.agenda-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.agenda-titulo {
+  margin: 0;
+  color: #1e293b;
+  font-size: 1.7rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.agenda-titulo svg {
+  color: #3498db;
+}
+
+.agenda-subtitulo {
+  margin: 4px 0 0 0;
+  color: #64748b;
+  font-size: 0.92rem;
+}
+
+.btn-nueva-cita {
+  background-color: #2ecc71;
+  color: #fff;
+  border: none;
+  padding: 11px 20px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(46, 204, 113, 0.25);
+}
+
+.agenda-layout {
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  gap: 22px;
+  align-items: start;
+}
+
+@media (max-width: 860px) {
+  .agenda-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Calendario Mensual */
+.calendario-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+}
+
+.calendario-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.calendario-nav h3 {
+  margin: 0;
+  color: #1e293b;
+  font-size: 1.2rem;
+}
+
+.btn-cal-nav {
+  background: #f1f5f9;
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.calendario-grid-header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.cal-dia-nombre {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #64748b;
+  padding: 6px 0;
+}
+
+.calendario-grid-body {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+
+.cal-celda {
+  min-height: 64px;
+  border: 1px solid #f1f5f9;
+  border-radius: 10px;
+  padding: 6px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  background: #f8fafc;
+  transition: all 0.15s;
+}
+
+.cal-celda:hover {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.cal-celda-vacia {
+  background: transparent;
+  border: none;
+  cursor: default;
+}
+
+.cal-hoy {
+  border: 2px solid #3498db;
+}
+
+.cal-seleccionado {
+  background: #3498db !important;
+  color: #ffffff;
+  border-color: #2980b9;
+}
+
+.cal-numero-dia {
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.cal-badge-citas {
+  background: #2ecc71;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 10px;
+}
+
+.cal-seleccionado .cal-badge-citas {
+  background: #ffffff;
+  color: #1e293b;
+}
+
+.calendario-footer-info {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid #f1f5f9;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+/* Detalle del Día */
+.agenda-detalle-col {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.agenda-dia-card, .agenda-proximas-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+}
+
+.agenda-dia-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 12px;
+  margin-bottom: 14px;
+}
+
+.agenda-dia-header h3 {
+  margin: 0;
+  color: #1e293b;
+  font-size: 1.1rem;
+}
+
+.btn-agendar-mini {
+  background: #e8f4fd;
+  color: #2980b9;
+  border: none;
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.82rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.agenda-dia-vacio {
+  text-align: center;
+  padding: 25px 10px;
+  color: #94a3b8;
+}
+
+.lista-citas-dia {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cita-item {
+  display: flex;
+  gap: 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #3498db;
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.cita-item.estado-completada {
+  border-left-color: #2ecc71;
+}
+
+.cita-item.estado-cancelada {
+  border-left-color: #e74c3c;
+  opacity: 0.75;
+}
+
+.cita-hora-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #eff6ff;
+  color: #1e40af;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-weight: 800;
+  font-size: 0.9rem;
+  min-width: 65px;
+}
+
+.cita-info-box {
+  flex: 1;
+}
+
+.cita-top-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cita-top-line h4 {
+  margin: 0;
+  color: #1e293b;
+  font-size: 1rem;
+}
+
+.badge-estado-cita {
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.badge-completada { background: #dcfce7; color: #166534; }
+.badge-cancelada { background: #fee2e2; color: #991b1b; }
+.badge-programada, .badge-confirmada { background: #dbeafe; color: #1e40af; }
+
+.cita-motivo, .cita-notas {
+  margin: 5px 0;
+  font-size: 0.86rem;
+  color: #475569;
+}
+
+.cita-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.btn-cita-exp, .btn-cita-ok, .btn-cita-edit, .btn-cita-del {
+  border: none;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  text-decoration: none;
+}
+
+.btn-cita-exp { background: #e8f4fd; color: #2980b9; }
+.btn-cita-ok { background: #dcfce7; color: #166534; }
+.btn-cita-edit { background: #f1f5f9; color: #334155; }
+.btn-cita-del { background: #fee2e2; color: #dc2626; }
+
+/* Próximas citas mini */
+.agenda-proximas-card h4 {
+  margin: 0 0 12px 0;
+  color: #1e293b;
+}
+
+.proximas-mini-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.proxima-mini-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid #e2e8f0;
+}
+
+.proxima-fecha-tag {
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+/* Modal */
+.agenda-modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(15, 23, 42, 0.65);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1600;
+  padding: 20px;
+}
+
+.agenda-modal-content {
+  background: #fff;
+  width: 100%;
+  max-width: 560px;
+  border-radius: 16px;
+  padding: 24px 28px;
+}
+
+.agenda-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+}
+
+.agenda-modal-header h3 { margin: 0; color: #1e293b; }
+.btn-close-agenda { background: none; border: none; font-size: 1.2rem; color: #dc2626; cursor: pointer; }
+
+.agenda-form { display: flex; flex-direction: column; gap: 14px; }
+.agenda-grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+.agenda-field { display: flex; flex-direction: column; gap: 5px; }
+.agenda-field label { font-size: 0.84rem; font-weight: 600; color: #334155; }
+.agenda-field input, .agenda-field select, .agenda-field textarea {
+  padding: 9px 11px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.92rem;
+}
+
+.agenda-modal-actions {
+  display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;
+}
+
+.btn-agenda-cancel {
+  background: #f1f5f9; color: #475569; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer;
+}
+.btn-agenda-save {
+  background: #2ecc71; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px;
+}
+
+/* Vista de Citas del Paciente */
+.citas-px-tabs {
+  display: flex; gap: 10px; margin-bottom: 20px;
+}
+.citas-px-tabs button {
+  padding: 10px 18px; border-radius: 10px; border: 1px solid #cbd5e1; background: #fff; color: #475569; font-weight: 700; cursor: pointer;
+}
+.citas-px-tabs button.tab-px-active {
+  background: #3498db; color: #fff; border-color: #3498db;
+}
+
+.citas-px-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 18px;
+}
+.cita-px-card {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+}
+.cita-px-card-header {
+  background: #f8fafc; padding: 12px 16px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;
+}
+.cita-px-fecha-hora {
+  display: flex; gap: 12px; font-weight: 700; color: #1e293b; font-size: 0.92rem;
+}
+.cita-px-fecha-hora span { display: inline-flex; align-items: center; gap: 5px; }
+
+.badge-recordatorio-px {
+  padding: 4px 10px; border-radius: 12px; font-size: 0.76rem; font-weight: 700; display: inline-flex; align-items: center; gap: 5px;
+}
+.alerta-cita-hoy { background: #fee2e2; color: #b91c1c; }
+.alerta-cita-1d { background: #ffedd5; color: #c2410c; }
+.alerta-cita-2d, .alerta-cita-5d { background: #fef3c7; color: #b45309; }
+.alerta-cita-normal { background: #e0f2fe; color: #0369a1; }
+
+.cita-px-body { padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.cita-px-medico { margin: 0; font-size: 1.1rem; color: #1e293b; display: flex; align-items: center; gap: 8px; }
+.cita-px-esp { font-size: 0.82rem; color: #64748b; margin-top: -6px; }
+.cita-px-motivo-box, .cita-px-indicaciones {
+  background: #f8fafc; padding: 10px 12px; border-radius: 8px; font-size: 0.88rem;
+}
+.cita-px-motivo-box p, .cita-px-indicaciones p { margin: 4px 0 0 0; color: #334155; }
+.cita-px-contacto {
+  display: flex; flex-direction: column; gap: 4px; font-size: 0.82rem; color: #64748b; padding-top: 6px; border-top: 1px dashed #e2e8f0;
+}

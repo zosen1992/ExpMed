@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { auth, db } from '../firebase';
 import { ref, onValue, set, push, update, get, remove } from 'firebase/database';
-import { FaArrowLeft, FaPlus, FaEdit, FaTimes, FaSave, FaEye, FaTrashAlt } from 'react-icons/fa';
+import { FaArrowLeft, FaPlus, FaEdit, FaTimes, FaSave, FaEye, FaTrashAlt, FaLock } from 'react-icons/fa';
 import { PiSealWarningDuotone } from "react-icons/pi";
+import { estaVigenciaVencida } from '../utilidades/verificadorVigencia';
 import '../Estilos/Alergias.css';
 
 const Alergias = () => {
@@ -13,6 +14,9 @@ const Alergias = () => {
   const [alergias, setAlergias] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [nombreUsuario, setNombreUsuario] = useState("");
+  const [vigenciaVencida, setVigenciaVencida] = useState(
+    localStorage.getItem('vigenciaVencida') === 'true'
+  );
 
   // Estados del Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -28,12 +32,12 @@ const Alergias = () => {
 
   useEffect(() => {
     if (myuid) {
-      // 1. Buscar el nombre del usuario logueado en cualquiera de las ramas de rol
-      const obtenerNombreUsuario = async () => {
+      // 1. Buscar el nombre y estado de vigencia del usuario logueado
+      const obtenerNombreYVigencia = async () => {
         const rolLocal = localStorage.getItem('rolActivo');
         const ramas = rolLocal 
-          ? [rolLocal, 'medico', 'enfermeria', 'enfermero', 'enfemero', 'px', 'otro'] 
-          : ['medico', 'enfermeria', 'enfermero', 'enfemero', 'px', 'otro'];
+          ? [rolLocal, 'medico', 'enfermeria', 'enfermero', 'enfemero', 'px', 'admin', 'otro'] 
+          : ['medico', 'enfermeria', 'enfermero', 'enfemero', 'px', 'admin', 'otro'];
 
         for (const r of ramas) {
           const snap = await get(ref(db, `usuarios/${r}/${myuid}`));
@@ -41,12 +45,21 @@ const Alergias = () => {
             const val = snap.val();
             const nombreDetectado = val.nombre || val.nombrecom || auth.currentUser?.email || "Usuario";
             setNombreUsuario(nombreDetectado);
+
+            const rolLow = String(val.rol || r).toLowerCase();
+            if (r === 'medico' || r === 'enfermeria' || r === 'enfermero' || r === 'enfemero' || rolLow === 'medico' || rolLow.includes('enfermer')) {
+              const vencida = estaVigenciaVencida(val.vigencia);
+              setVigenciaVencida(vencida);
+              localStorage.setItem('vigenciaVencida', vencida ? 'true' : 'false');
+            } else {
+              setVigenciaVencida(false);
+            }
             break;
           }
         }
       };
 
-      obtenerNombreUsuario();
+      obtenerNombreYVigencia();
 
       // 2. Obtener las alergias del paciente
       if (id) {
@@ -77,6 +90,9 @@ const Alergias = () => {
   };
 
   const abrirModalNuevo = () => {
+    if (vigenciaVencida) {
+      return alert("⛔ Modo de solo lectura: Tu vigencia está vencida y no puedes agregar nuevas alergias.");
+    }
     setIsEditing(false);
     setIsReadOnly(false);
     setEditPid(null);
@@ -90,6 +106,13 @@ const Alergias = () => {
 
   // Función para Ver (modoLectura = true) o Editar (modoLectura = false)
   const abrirModalRegistro = (alergiaItem, modoLectura = false) => {
+    if (vigenciaVencida) {
+      if (alergiaItem.uidcap !== myuid) {
+        return alert("Con vigencia vencida solo puedes visualizar registros creados por ti.");
+      }
+      modoLectura = true;
+    }
+
     if (!modoLectura && alergiaItem.uidcap !== myuid) {
       return alert("Acceso denegado: Solo el usuario que registró esta alergia puede editarla.");
     }
@@ -109,8 +132,11 @@ const Alergias = () => {
     setIsModalOpen(true);
   };
 
-  // Eliminar alergia (Solo quien la agregó)
+  // Eliminar alergia (Solo quien la agregó y con vigencia activa)
   const handleEliminar = async (alergiaItem) => {
+    if (vigenciaVencida) {
+      return alert("⛔ Acción bloqueada: No puedes eliminar registros con vigencia vencida.");
+    }
     if (alergiaItem.uidcap !== myuid) {
       return alert("Acceso denegado: Solo el usuario que agregó esta alergia puede eliminarla.");
     }
@@ -130,6 +156,9 @@ const Alergias = () => {
   const handleGuardar = async (e) => {
     e.preventDefault();
     if (!myuid) return alert("Error: Sesión no válida.");
+    if (vigenciaVencida) {
+      return alert("⛔ Acción bloqueada: Tu cuenta está en modo solo lectura por vigencia vencida.");
+    }
 
     try {
       const fechaActual = new Date().toLocaleString('es-MX', { 
@@ -175,10 +204,28 @@ const Alergias = () => {
     }
   };
 
+  // Si la vigencia está vencida, solo ve las alergias que él mismo capturó
+  const alergiasVisibles = vigenciaVencida
+    ? alergias.filter((item) => item.uidcap === myuid)
+    : alergias;
+
   if (cargando) return <div style={{ textAlign: 'center', marginTop: '50px' }}>Cargando alergias...</div>;
 
   return (
     <div className='alergias-container'>
+      {vigenciaVencida && (
+        <div style={{
+          backgroundColor: '#fff3cd', color: '#856404', border: '1px solid #ffeeba',
+          borderRadius: '10px', padding: '12px 16px', marginBottom: '18px',
+          display: 'flex', alignItems: 'center', gap: '10px'
+        }}>
+          <FaLock />
+          <span>
+            <strong>Modo Solo Lectura (Vigencia Vencida):</strong> Solo se muestran las alergias registradas por ti. No puedes agregar, editar ni eliminar información.
+          </span>
+        </div>
+      )}
+
       <div className='alergias-header'>
         <Link to={`/px/${id}`} className='btn-regresar'>
           <FaArrowLeft /> Regresar al menú
@@ -186,24 +233,32 @@ const Alergias = () => {
         <h2 className='alergias-titulo'><PiSealWarningDuotone /> Registro de Alergias</h2>
       </div>
 
-      {alergias.length === 0 ? (
+      {alergiasVisibles.length === 0 ? (
         <div className='empty-state'>
           <PiSealWarningDuotone className='empty-icon' />
-          <h3>No hay información registrada</h3>
-          <p>Este paciente no tiene alergias capturadas en el sistema.</p>
-          <button onClick={abrirModalNuevo} className='btn-agregar-main'>
-            <FaPlus /> Agregar Alergia
-          </button>
+          <h3>{vigenciaVencida ? 'Sin registros propios de alergias' : 'No hay información registrada'}</h3>
+          <p>
+            {vigenciaVencida
+              ? 'Con vigencia vencida solo puedes visualizar registros que hayan sido capturados por ti.'
+              : 'Este paciente no tiene alergias capturadas en el sistema.'}
+          </p>
+          {!vigenciaVencida && (
+            <button onClick={abrirModalNuevo} className='btn-agregar-main'>
+              <FaPlus /> Agregar Alergia
+            </button>
+          )}
         </div>
       ) : (
         <div className='lista-alergias'>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '15px' }}>
-             <button onClick={abrirModalNuevo} className='btn-agregar-small'>
-               <FaPlus /> Nueva Alergia
-             </button>
-          </div>
+          {!vigenciaVencida && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '15px' }}>
+               <button onClick={abrirModalNuevo} className='btn-agregar-small'>
+                 <FaPlus /> Nueva Alergia
+               </button>
+            </div>
+          )}
 
-          {alergias.map((item) => {
+          {alergiasVisibles.map((item) => {
             const esAutor = item.uidcap === myuid;
             return (
               <div key={item.pid} className='alergia-card'>
@@ -215,7 +270,6 @@ const Alergias = () => {
                 </div>
 
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                  {/* Botón VER disponible para todos */}
                   <button 
                     onClick={() => abrirModalRegistro(item, true)} 
                     className='btn-ver-alergia'
@@ -235,8 +289,8 @@ const Alergias = () => {
                     <FaEye /> Ver
                   </button>
 
-                  {/* Botones EDITAR y ELIMINAR solo para quien agregó la alergia */}
-                  {esAutor && (
+                  {/* Botones EDITAR y ELIMINAR solo si es autor y su vigencia NO está vencida */}
+                  {esAutor && !vigenciaVencida && (
                     <>
                       <button onClick={() => abrirModalRegistro(item, false)} className='btn-editar'>
                         <FaEdit /> Editar
@@ -316,7 +370,7 @@ const Alergias = () => {
                 <button type="button" onClick={() => setIsModalOpen(false)} className='btn-cancelar'>
                   {isReadOnly ? 'Cerrar' : 'Cancelar'}
                 </button>
-                {!isReadOnly && (
+                {!isReadOnly && !vigenciaVencida && (
                   <button type="submit" className='btn-guardar'>
                     <FaSave /> {isEditing ? 'Actualizar' : 'Guardar'}
                   </button>

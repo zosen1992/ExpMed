@@ -21,6 +21,8 @@ import Notificaciones from './Componentes/Notificaciones';
 import BuscarProfesional from './Componentes/BuscarProfesional';
 import ConsultaGeneral from './Componentes/ConsultaGeneral';
 import AdminUsuarios from './Componentes/AdminUsuarios';
+import Agenda from './Componentes/Agenda';
+import CitasPaciente from './Componentes/CitasPaciente';
 
 
 
@@ -109,6 +111,9 @@ function App() {
         <Route path="/PHc/:id" element={<RutaSinEnfermeriaNiPx><PHc /></RutaSinEnfermeriaNiPx>} />
 
         {/* RUTAS COMPARTIDAS */}
+        <Route path="/Agenda" element={<RutaSoloPersonal><Agenda /></RutaSoloPersonal>} />
+        <Route path="/mis-citas/:id" element={<RutaProtegida><CitasPaciente /></RutaProtegida>} />
+
         <Route path="/px/:id" element={<RutaProtegida><Menupx /></RutaProtegida>} />
         <Route path="/alergias/:id" element={<RutaProtegida><Alergias /></RutaProtegida>} />
         <Route path="/sv/:id" element={<RutaProtegida><Sv /></RutaProtegida>} />

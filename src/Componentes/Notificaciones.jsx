@@ -7,6 +7,7 @@ import {
   FaExclamationTriangle, FaUserInjured, FaClock, FaCalendarTimes 
 } from 'react-icons/fa';
 import '../Estilos/Notificaciones.css';
+import { verificarCitasDeUsuario } from '../utilidades/verificadorCitas';
 
 const Notificaciones = () => {
   const navigate = useNavigate();
@@ -38,7 +39,7 @@ const Notificaciones = () => {
   }, [myuid]);
 
   const handleAbrirNotificacion = async (item) => {
-    const destino = item.tipoNotif === 'VIGENCIA' 
+    const destino = (item.tipoNotif === 'VIGENCIA' || item.tipoNotif === 'CITA')
       ? (item.rutaDestino || '/') 
       : `/sv/${item.uidPx}`;
 
