@@ -143,7 +143,7 @@ const Datospx = () => {
           <FaArrowLeft /> Regresar al menú del paciente
         </Link>
 
-        {!editMode && (
+        {!editMode && localStorage.getItem('vigenciaVencida') !== 'true' && (
           <button onClick={() => setEditMode(true)} style={btnEditStyle}>
             <FaUserEdit /> Actualizar Información
           </button>

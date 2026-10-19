@@ -4,42 +4,7 @@ import { auth, db } from '../firebase';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { ref, get } from 'firebase/database';
 import { FaUserShield, FaLock, FaEnvelope, FaUserTag } from 'react-icons/fa';
-import { evaluarYNotificarVigenciaUsuario } from '../utilidades/verificadorVigencia';
-
-// Convierte fechas en formato YYYY-MM-DD o DD/MM/YYYY a objeto Date local (a las 23:59:59 de ese día)
-const parsearFechaVigencia = (fechaStr) => {
-  if (!fechaStr || typeof fechaStr !== 'string') return null;
-  const limpio = fechaStr.trim();
-  if (!limpio || limpio.toUpperCase() === 'N/A') return null;
-
-  let anio, mes, dia;
-
-  if (limpio.includes('/')) {
-    const partes = limpio.split('/');
-    if (partes.length === 3) {
-      // Formato DD/MM/YYYY o YYYY/MM/DD
-      if (partes[0].length === 4) {
-        [anio, mes, dia] = partes.map(Number);
-      } else {
-        [dia, mes, anio] = partes.map(Number);
-      }
-    }
-  } else if (limpio.includes('-')) {
-    const partes = limpio.split('-');
-    if (partes.length === 3) {
-      // Formato YYYY-MM-DD o DD-MM-YYYY
-      if (partes[0].length === 4) {
-        [anio, mes, dia] = partes.map(Number);
-      } else {
-        [dia, mes, anio] = partes.map(Number);
-      }
-    }
-  }
-
-  if (!anio || !mes || !dia) return null;
-  const fecha = new Date(anio, mes - 1, dia, 23, 59, 59, 999);
-  return isNaN(fecha.getTime()) ? null : fecha;
-};
+import { evaluarYNotificarVigenciaUsuario, estaVigenciaVencida } from '../utilidades/verificadorVigencia';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -53,6 +18,7 @@ const Login = () => {
     setCargando(true);
 
     localStorage.removeItem('rolActivo');
+    localStorage.removeItem('vigenciaVencida');
     sessionStorage.setItem('validandoRolLogin', 'true');
 
     try {
@@ -86,24 +52,20 @@ const Login = () => {
         return;
       }
 
+      // Evaluar notificaciones de vigencia (7, 3, 1, -2 días) y estado de vigencia vencida
       if (rolSeleccionado === 'medico' || rolSeleccionado === 'enfermeria') {
         await evaluarYNotificarVigenciaUsuario(uid, datosUsuario, ramaEncontrada);
-      }
-      // VALIDACIÓN DE VIGENCIA PARA MÉDICO Y ENFERMERÍA
-      if (rolSeleccionado === 'medico' || rolSeleccionado === 'enfermeria') {
-        const fechaLimiteVigencia = parsearFechaVigencia(datosUsuario.vigencia);
-        const fechaActual = new Date();
+        const vencida = estaVigenciaVencida(datosUsuario.vigencia);
+        localStorage.setItem('vigenciaVencida', vencida ? 'true' : 'false');
 
-        if (!fechaLimiteVigencia || fechaActual > fechaLimiteVigencia) {
-          await signOut(auth);
-          sessionStorage.removeItem('validandoRolLogin');
-          setCargando(false);
+        if (vencida) {
           alert(
-            `⛔ Acceso denegado: La vigencia de tu cuenta (${datosUsuario.vigencia || 'Sin vigencia'}) se ha superado.\n\n` +
-            `Por favor contacta al Administrador para renovar tu acceso.`
+            `⚠️ Aviso de Vigencia Vencida (${datosUsuario.vigencia || 'N/A'}):\n\n` +
+            `Has ingresado en MODO SOLO LECTURA. Solo podrás consultar a tus pacientes asignados y visualizar únicamente los registros creados por ti, sin poder agregar, editar ni eliminar información.`
           );
-          return;
         }
+      } else {
+        localStorage.setItem('vigenciaVencida', 'false');
       }
 
       const rolGuardar = rolSeleccionado === 'admin' ? 'admin' : ramaEncontrada;
@@ -176,7 +138,7 @@ const Login = () => {
           </div>
 
           <button type="submit" disabled={cargando} style={btnStyle}>
-            {cargando ? 'Verificando perfil y vigencia...' : 'Iniciar Sesión'}
+            {cargando ? 'Verificando perfil...' : 'Iniciar Sesión'}
           </button>
         </form>
       </div>

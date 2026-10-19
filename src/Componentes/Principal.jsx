@@ -63,7 +63,7 @@ for (const r of ramasABuscar) {
             } else {
               rolFinal = 'medico';
             }
-
+/*
             // Validar vigencia al recargar la página si es Médico o Enfermería
             if (rolFinal === 'medico' || rolFinal === 'enfermeria') {
               const vigStr = (data.vigencia || '').trim();
@@ -84,6 +84,21 @@ for (const r of ramasABuscar) {
                 navigate('/login', { replace: true });
                 return;
               }
+            }*/
+
+            if (rolFinal === 'medico' || rolFinal === 'enfermeria') {
+              const vigStr = (data.vigencia || '').trim();
+              let fechaVig = null;
+              if (vigStr && vigStr.toUpperCase() !== 'N/A') {
+                const sep = vigStr.includes('/') ? '/' : '-';
+                const p = vigStr.split(sep);
+                if (p.length === 3) {
+                  const [a, m, d] = p[0].length === 4 ? p.map(Number) : [Number(p[2]), Number(p[1]), Number(p[0])];
+                  fechaVig = new Date(a, m - 1, d, 23, 59, 59, 999);
+                }
+              }
+              const vencida = !fechaVig || isNaN(fechaVig.getTime()) || new Date() > fechaVig;
+              localStorage.setItem('vigenciaVencida', vencida ? 'true' : 'false');
             }
 
             encontrado = true;

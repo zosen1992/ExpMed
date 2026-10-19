@@ -27,6 +27,19 @@ export const obtenerFechaMedianoche = (fechaStr) => {
   return isNaN(fecha.getTime()) ? null : fecha;
 };
 
+// Evalúa si la fecha de vigencia ya fue superada por la fecha actual (después de las 23:59:59 de ese día)
+export const estaVigenciaVencida = (fechaStr) => {
+  const fechaBase = obtenerFechaMedianoche(fechaStr);
+  if (!fechaBase) return true; // Si no tiene fecha válida, se considera vencida para Médico/Enfermería
+  const finDelDia = new Date(
+    fechaBase.getFullYear(),
+    fechaBase.getMonth(),
+    fechaBase.getDate(),
+    23, 59, 59, 999
+  );
+  return new Date() > finDelDia;
+};
+
 // Calcula cuántos días exactos faltan (positivo) o han pasado tras vencer (negativo)
 export const calcularDiasRestantesVigencia = (fechaStr) => {
   const fechaVig = obtenerFechaMedianoche(fechaStr);
@@ -39,7 +52,6 @@ export const calcularDiasRestantesVigencia = (fechaStr) => {
   return Math.round(diffMs / (1000 * 60 * 60 * 24));
 };
 
-// Obtiene todos los UIDs de Administradores registrados en usuarios/admin y usuarios/otro
 const obtenerUidsAdministradores = async () => {
   const uids = new Set();
   for (const rama of ['admin', 'otro']) {
@@ -51,7 +63,6 @@ const obtenerUidsAdministradores = async () => {
   return Array.from(uids);
 };
 
-// Evalúa un usuario individual y si está en 7, 3, 1 o -2 días genera la notificación al usuario y a los admins
 export const evaluarYNotificarVigenciaUsuario = async (uidUsuario, datosUsuario, ramaRol, listaAdminsPrevia = null) => {
   if (!uidUsuario || !datosUsuario || !datosUsuario.vigencia) return;
 
@@ -71,7 +82,6 @@ export const evaluarYNotificarVigenciaUsuario = async (uidUsuario, datosUsuario,
     hour: '2-digit', minute: '2-digit'
   });
 
-  // Textos claros según el día
   let mensajeParaUsuario = '';
   let mensajeParaAdmin = '';
 
@@ -79,17 +89,16 @@ export const evaluarYNotificarVigenciaUsuario = async (uidUsuario, datosUsuario,
     mensajeParaUsuario = `Tu vigencia vence en 7 días (${datosUsuario.vigencia}). Solicita tu renovación oportunamente.`;
     mensajeParaAdmin = `La vigencia de ${nombreProf} (${rolMostrar}) vencerá en 7 días (${datosUsuario.vigencia}).`;
   } else if (diasRestantes === 3) {
-    mensajeParaUsuario = `⚠️ Tu vigencia vence en 3 días (${datosUsuario.vigencia}). Evita la suspensión de tu acceso.`;
+    mensajeParaUsuario = `⚠️ Tu vigencia vence en 3 días (${datosUsuario.vigencia}). Evita restricciones en tu cuenta.`;
     mensajeParaAdmin = `⚠️ La vigencia de ${nombreProf} (${rolMostrar}) vencerá en 3 días (${datosUsuario.vigencia}).`;
   } else if (diasRestantes === 1) {
     mensajeParaUsuario = `🚨 ¡Atención! Mañana (1 día) vence la vigencia de tu cuenta (${datosUsuario.vigencia}).`;
     mensajeParaAdmin = `🚨 Mañana (1 día) vence la vigencia de ${nombreProf} (${rolMostrar} - ${datosUsuario.vigencia}).`;
   } else if (diasRestantes === -2) {
-    mensajeParaUsuario = `⛔ Tu vigencia venció hace 2 días (${datosUsuario.vigencia}). Contacta al Administrador para reactivar tu cuenta.`;
+    mensajeParaUsuario = `⛔ Tu vigencia venció hace 2 días (${datosUsuario.vigencia}). Tu cuenta se encuentra en modo solo lectura de tus propios registros.`;
     mensajeParaAdmin = `⛔ La vigencia de ${nombreProf} (${rolMostrar}) cumplió 2 días vencida (${datosUsuario.vigencia}).`;
   }
 
-  // 1. Notificación para el propio Usuario (Médico / Enfermería)
   const idNotifUser = `vig_usr_${uidUsuario}_${claveVigenciaLimpia}_${etiquetaHito}`;
   const refNotifUser = ref(db, `notificaciones/${uidUsuario}/${idNotifUser}`);
   const snapNotifUser = await get(refNotifUser);
@@ -111,7 +120,6 @@ export const evaluarYNotificarVigenciaUsuario = async (uidUsuario, datosUsuario,
     });
   }
 
-  // 2. Notificación para todos los Administradores
   const uidsAdmins = listaAdminsPrevia || (await obtenerUidsAdministradores());
   const promesasAdmins = uidsAdmins.map(async (uidAdmin) => {
     const idNotifAdmin = `vig_adm_${uidUsuario}_${claveVigenciaLimpia}_${etiquetaHito}`;
@@ -139,7 +147,6 @@ export const evaluarYNotificarVigenciaUsuario = async (uidUsuario, datosUsuario,
   await Promise.all(promesasAdmins);
 };
 
-// Barrido general de todos los Médicos y Enfermeros (para asegurar alertas incluso de usuarios que tienen 2 días vencidos y no han entrado)
 export const verificarVigenciasGlobalmente = async () => {
   try {
     const uidsAdmins = await obtenerUidsAdministradores();

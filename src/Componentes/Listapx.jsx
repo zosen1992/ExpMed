@@ -4,10 +4,11 @@ import { auth, db } from '../firebase';
 import { ref, onValue, get, set } from 'firebase/database';
 import { 
   FaHome, FaUserPlus, FaSearch, FaMapMarkerAlt, 
-  FaPlusCircle, FaTimes 
+  FaPlusCircle, FaTimes, FaLock 
 } from 'react-icons/fa';
 import Listapxcard from './Listapxcard';
 import { normalizarTexto } from '../constantes/estados';
+import { estaVigenciaVencida } from '../utilidades/verificadorVigencia';
 import '../Estilos/Listapx.css';
 
 function Listapx() {
@@ -17,28 +18,41 @@ function Listapx() {
   const [misPacientesIds, setMisPacientesIds] = useState({});
   const [todosLosPacientes, setTodosLosPacientes] = useState([]);
   const [localidadProfesional, setLocalidadProfesional] = useState('');
+  const [vigenciaVencida, setVigenciaVencida] = useState(
+    localStorage.getItem('vigenciaVencida') === 'true'
+  );
   const [busqueda, setBusqueda] = useState('');
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
     if (!myuid) return;
 
-    // 1. Obtener la localidad del médico / enfermero logueado
-    const obtenerLocalidadProf = async () => {
+    // 1. Obtener la localidad y validar vigencia del médico / enfermero logueado
+    const obtenerDatosProf = async () => {
       const rolLocal = localStorage.getItem('rolActivo');
       const ramas = rolLocal 
-        ? [rolLocal, 'medico', 'enfermeria', 'enfermero', 'enfemero', 'otro'] 
-        : ['medico', 'enfermeria', 'enfermero', 'enfemero', 'otro'];
+        ? [rolLocal, 'medico', 'enfermeria', 'enfermero', 'enfemero', 'admin', 'otro'] 
+        : ['medico', 'enfermeria', 'enfermero', 'enfemero', 'admin', 'otro'];
 
       for (const r of ramas) {
         const snap = await get(ref(db, `usuarios/${r}/${myuid}`));
         if (snap.exists()) {
-          setLocalidadProfesional(snap.val().localidad || '');
+          const data = snap.val();
+          setLocalidadProfesional(data.localidad || '');
+
+          const rolEval = (data.rol || r).toLowerCase();
+          if (r === 'medico' || r === 'enfermeria' || r === 'enfermero' || r === 'enfemero' || rolEval === 'medico' || rolEval.includes('enfermer')) {
+            const vencida = estaVigenciaVencida(data.vigencia);
+            setVigenciaVencida(vencida);
+            localStorage.setItem('vigenciaVencida', vencida ? 'true' : 'false');
+          } else {
+            setVigenciaVencida(false);
+          }
           break;
         }
       }
     };
-    obtenerLocalidadProf();
+    obtenerDatosProf();
 
     // 2. Escuchar los IDs de pacientes del médico logueado: px/[myuid]
     const relRef = ref(db, `px/${myuid}`);
@@ -69,8 +83,10 @@ function Listapx() {
     };
   }, [myuid]);
 
-  // Advertencia obligatoria antes de agregar al paciente y abrir su expediente
   const handleSolicitarAgregarPx = async (pxObj) => {
+    if (vigenciaVencida) {
+      return alert("⛔ Tu vigencia está vencida. No puedes agregar ni vincular nuevos pacientes a tu lista.");
+    }
     if (!myuid || !pxObj?.uid) return;
 
     const nombreMostrar = pxObj.nombre || pxObj.nombrecom || 'este paciente';
@@ -80,7 +96,7 @@ function Listapx() {
       `¿Deseas agregarlo a tus pacientes y continuar?`
     );
 
-    if (!confirmar) return; // Si cancela, no abre el expediente ni lo agrega
+    if (!confirmar) return;
 
     try {
       await set(ref(db, `px/${myuid}/${pxObj.uid}`), { uid: pxObj.uid });
@@ -116,8 +132,8 @@ function Listapx() {
     );
   });
 
-  // 2. BÚSQUEDA DE PACIENTES EXISTENTES REGISTRADOS (Solo aparece cuando escribe en el buscador)
-  const pacientesExistentesEncontrados = hayBusquedaActiva
+  // 2. BÚSQUEDA DE PACIENTES EXTERNOS: Solo permitida si la vigencia NO está vencida
+  const pacientesExistentesEncontrados = (hayBusquedaActiva && !vigenciaVencida)
     ? todosLosPacientes.filter((p) => {
         const yaEsMio = Boolean(misPacientesIds && misPacientesIds[p.uid]);
         if (yaEsMio) return false;
@@ -141,6 +157,19 @@ function Listapx() {
   return (
     <div style={{ maxWidth: '1050px', margin: '30px auto', padding: '0 20px', fontFamily: 'Segoe UI, sans-serif' }}>
       
+      {/* BANNER INFORMATIVO CUANDO LA VIGENCIA ESTÁ VENCIDA */}
+      {vigenciaVencida && (
+        <div style={bannerVencidoStyle}>
+          <FaLock style={{ fontSize: '1.2rem', flexShrink: 0 }} />
+          <div>
+            <strong>Vigencia Vencida — Modo de Consulta Restringida:</strong>
+            <p style={{ margin: '2px 0 0 0', fontSize: '0.88rem' }}>
+              Solo puedes visualizar a tus pacientes actuales y consultar los registros que tú hayas creado. No está permitido registrar nuevos pacientes ni buscar pacientes externos.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* BARRA DE NAVEGACIÓN Y ACCIONES */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
         <Link to="/" style={btnMenuStyle}>
@@ -153,9 +182,13 @@ function Listapx() {
               <FaMapMarkerAlt /> Localidad activa: {localidadProfesional}
             </span>
           )}
-          <Link to="/formulario" style={btnNuevoPxStyle}>
-            <FaUserPlus /> Registrar Nuevo Paciente
-          </Link>
+
+          {/* OCULTAR BOTÓN DE REGISTRAR NUEVO PACIENTE SI LA VIGENCIA ESTÁ VENCIDA */}
+          {!vigenciaVencida && (
+            <Link to="/formulario" style={btnNuevoPxStyle}>
+              <FaUserPlus /> Registrar Nuevo Paciente
+            </Link>
+          )}
         </div>
       </div>
 
@@ -164,7 +197,11 @@ function Listapx() {
         <FaSearch style={{ color: '#3498db', fontSize: '1.1rem' }} />
         <input
           type="text"
-          placeholder="Buscar en mis pacientes o buscar pacientes existentes registrados (por nombre, correo, celular o ID)..."
+          placeholder={
+            vigenciaVencida
+              ? "Buscar únicamente dentro de mis pacientes asignados..."
+              : "Buscar en mis pacientes o buscar pacientes existentes registrados (por nombre, correo, celular o ID)..."
+          }
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
           style={searchInputStyle}
@@ -189,8 +226,8 @@ function Listapx() {
         <div style={emptyBoxStyle}>
           <p style={{ margin: 0, color: '#7f8c8d' }}>
             {hayBusquedaActiva 
-              ? `Ninguno de tus pacientes asignados coincide con "${busqueda}". Revisa los resultados generales debajo.` 
-              : 'Aún no tienes pacientes asignados en tu lista. Registra uno nuevo o utiliza el buscador para encontrar un paciente existente.'}
+              ? `Ninguno de tus pacientes asignados coincide con "${busqueda}".` 
+              : 'No tienes pacientes asignados en tu lista.'}
           </p>
         </div>
       ) : (
@@ -201,8 +238,8 @@ function Listapx() {
         </div>
       )}
 
-      {/* SECCIÓN 2: RESULTADOS DE BÚSQUEDA EN PACIENTES EXISTENTES REGISTRADOS */}
-      {hayBusquedaActiva && (
+      {/* SECCIÓN 2: RESULTADOS DE BÚSQUEDA EN PACIENTES EXTERNOS (Solo si la vigencia NO está vencida) */}
+      {hayBusquedaActiva && !vigenciaVencida && (
         <div style={{ marginTop: '35px' }}>
           <h3 style={{ color: '#2980b9', marginBottom: '12px', borderTop: '2px solid #eef2f5', paddingTop: '20px' }}>
             Pacientes existentes registrados encontrados ({pacientesExistentesEncontrados.length})
@@ -270,50 +307,46 @@ function Listapx() {
   );
 }
 
+const bannerVencidoStyle = {
+  backgroundColor: '#fff3cd', color: '#856404', border: '1px solid #ffeeba',
+  borderRadius: '10px', padding: '12px 16px', marginBottom: '20px',
+  display: 'flex', alignItems: 'center', gap: '12px'
+};
 const btnMenuStyle = {
   display: 'inline-flex', alignItems: 'center', gap: '8px',
   backgroundColor: '#f1f3f5', color: '#2c3e50', padding: '10px 16px',
   borderRadius: '8px', textDecoration: 'none', fontWeight: 600
 };
-
 const badgeLocStyle = {
   backgroundColor: '#e8f4fd', color: '#2980b9', padding: '8px 14px',
   borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600,
   display: 'inline-flex', alignItems: 'center', gap: '6px'
 };
-
 const btnNuevoPxStyle = {
   display: 'inline-flex', alignItems: 'center', gap: '8px',
   backgroundColor: '#2ecc71', color: '#fff', padding: '10px 18px',
   borderRadius: '8px', textDecoration: 'none', fontWeight: 600
 };
-
 const searchBarContainer = {
   backgroundColor: '#fff', border: '2px solid #d6eaf8', borderRadius: '12px',
   padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '12px',
   marginBottom: '25px', boxShadow: '0 3px 10px rgba(52, 152, 219, 0.08)'
 };
-
 const searchInputStyle = {
   border: 'none', outline: 'none', width: '100%', fontSize: '0.96rem', color: '#2c3e50'
 };
-
 const gridCardsStyle = {
   display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '18px'
 };
-
 const emptyBoxStyle = {
   backgroundColor: '#f8f9fa', padding: '30px', borderRadius: '12px',
   textAlign: 'center', border: '1px dashed #ced4da'
 };
-
 const cardExistenteStyle = {
   backgroundColor: '#ffffff', border: '1px solid #bcdff1', borderRadius: '14px',
   padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px',
-  justifyContent: 'space-between', boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-  cursor: 'pointer'
+  justifyContent: 'space-between', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', cursor: 'pointer'
 };
-
 const btnVincularStyle = {
   width: '100%', backgroundColor: '#3498db', color: '#fff', border: 'none',
   padding: '10px 12px', borderRadius: '8px', fontWeight: 600, fontSize: '0.88rem',

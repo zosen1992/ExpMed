@@ -9,6 +9,7 @@ import {
 } from 'react-icons/fa';
 import { GoBook } from "react-icons/go";
 import ModalReceta from './ModalReceta';
+import { estaVigenciaVencida } from '../utilidades/verificadorVigencia';
 import '../Estilos/Consulta.css';
 
 const Consulta = () => {
@@ -20,6 +21,9 @@ const Consulta = () => {
   const [cargando, setCargando] = useState(true);
   const [nombreUsuario, setNombreUsuario] = useState("");
   const [rolUsuario, setRolUsuario] = useState(localStorage.getItem('rolActivo') || "");
+  const [vigenciaVencida, setVigenciaVencida] = useState(
+    localStorage.getItem('vigenciaVencida') === 'true'
+  );
 
   // Datos para receta
   const [datosPx, setDatosPx] = useState({});
@@ -60,12 +64,12 @@ const Consulta = () => {
 
   useEffect(() => {
     if (myuid && id) {
-      // 1. Obtener nombre y ROL del usuario logueado (incluyendo 'px')
+      // 1. Obtener nombre, ROL y estado de VIGENCIA del usuario logueado
       const obtenerDatosUsuarioLogueado = async () => {
         const rolLocal = localStorage.getItem('rolActivo');
         const ramas = rolLocal 
-          ? [rolLocal, 'medico', 'enfermeria', 'enfermero', 'enfemero', 'px', 'otro'] 
-          : ['medico', 'enfermeria', 'enfermero', 'enfemero', 'px', 'otro'];
+          ? [rolLocal, 'medico', 'enfermeria', 'enfermero', 'enfemero', 'px', 'admin', 'otro'] 
+          : ['medico', 'enfermeria', 'enfermero', 'enfemero', 'px', 'admin', 'otro'];
 
         for (const rama of ramas) {
           const snap = await get(ref(db, `usuarios/${rama}/${myuid}`));
@@ -75,9 +79,18 @@ const Consulta = () => {
             const rolDetectado = data.rol || rama;
             setRolUsuario(rolDetectado);
 
-            // Seguridad: Si es un paciente, solo puede consultar su propio UID
-            if ((rama === 'px' || String(rolDetectado).toLowerCase() === 'px') && id !== myuid) {
+            const rolLow = String(rolDetectado).toLowerCase();
+            if ((rama === 'px' || rolLow === 'px') && id !== myuid) {
               navigate(`/consulta/${myuid}`, { replace: true });
+            }
+
+            // Verificar si es Médico o Enfermería y si su vigencia está vencida
+            if (rama === 'medico' || rama === 'enfermeria' || rama === 'enfermero' || rama === 'enfemero' || rolLow === 'medico' || rolLow.includes('enfermer')) {
+              const vencida = estaVigenciaVencida(data.vigencia);
+              setVigenciaVencida(vencida);
+              localStorage.setItem('vigenciaVencida', vencida ? 'true' : 'false');
+            } else {
+              setVigenciaVencida(false);
             }
             break;
           }
@@ -177,7 +190,7 @@ const Consulta = () => {
       localidadMedico: infoMedico.localidad || '',
       telefonoMedico: infoMedico.num_cel || infoMedico.celular || '',
       correoMedico: infoMedico.correo || '',
-      firmaMedico: infoMedico.firma ||'',
+      firmaMedico: infoMedico.firma || '',
       nombrePx: datosPx.nombre || datosPx.nombrecom || 'Paciente',
       edadPx: edadCalculada,
       sexoPx: datosPx.sexo || '',
@@ -215,7 +228,9 @@ const Consulta = () => {
   };
 
   const iniciarFormularioNuevo = (tipo) => {
-    if (esPx) return alert("Los pacientes no tienen permiso para crear registros en esta sección.");
+    if (esPx || vigenciaVencida) {
+      return alert("⛔ Modo de solo lectura: Tu vigencia está vencida y no puedes agregar nuevos registros.");
+    }
     if (esMedico && tipo === 'ENFERMERIA') {
       return alert("Restricción de Rol: Como Médico no puedes realizar Notas de Enfermería.");
     }
@@ -262,9 +277,14 @@ const Consulta = () => {
   };
 
   const abrirRegistro = (item, modoLectura = false) => {
-    // Si es paciente, solo puede abrir PROCEDIMIENTO y exclusivamente en modo lectura
     if (esPx) {
       if (item.tipo !== 'PROCEDIMIENTO') return;
+      modoLectura = true;
+    }
+
+    // Si la vigencia está vencida, forzar siempre modo lectura y solo sobre registros propios
+    if (vigenciaVencida) {
+      if (item.uidg !== myuid) return alert("Con vigencia vencida solo puedes visualizar registros creados por ti.");
       modoLectura = true;
     }
 
@@ -299,7 +319,9 @@ const Consulta = () => {
 
   const handleGuardar = async (e) => {
     e.preventDefault();
-    if (!myuid || esPx) return alert("Acción no permitida.");
+    if (!myuid || esPx || vigenciaVencida) {
+      return alert("⛔ Acción bloqueada: Tu cuenta está en modo solo lectura por vigencia vencida.");
+    }
 
     if (esEnfermero && tipoSeleccionado === 'MEDICA') {
       return alert("Acción bloqueada: El perfil de Enfermería no tiene permisos para guardar Notas Médicas.");
@@ -352,8 +374,8 @@ const Consulta = () => {
   };
 
   const toggleOcultoRapido = async (item) => {
-    if (esPx || item.uidg !== myuid) {
-      return alert("Solo el autor de la nota puede cambiar su visibilidad.");
+    if (esPx || vigenciaVencida || item.uidg !== myuid) {
+      return alert("Acción no permitida en modo de vigencia vencida.");
     }
     try {
       const nuevoEstado = !item.oculto;
@@ -364,8 +386,8 @@ const Consulta = () => {
   };
 
   const handleEliminar = async (item) => {
-    if (esPx || item.uidg !== myuid) {
-      return alert("Solo el usuario que guardó esta información puede eliminarla.");
+    if (esPx || vigenciaVencida || item.uidg !== myuid) {
+      return alert("Acción no permitida en modo de vigencia vencida.");
     }
     const confirmar = window.confirm("¿Estás seguro de que deseas eliminar este registro de forma permanente?");
     if (confirmar) {
@@ -384,10 +406,14 @@ const Consulta = () => {
     setFechaFin("");
   };
 
-  // Si el usuario logueado es Paciente (esPx), filtramos la lista base para que SOLO contenga PROCEDIMIENTOS
-  const visitasPermitidasPorRol = esPx 
-    ? visitas.filter(v => v.tipo === 'PROCEDIMIENTO') 
-    : visitas;
+  // FILTRO BASE POR ROL Y VIGENCIA:
+  // - Si es Paciente (esPx): Solo ve PROCEDIMIENTOS.
+  // - Si tiene Vigencia Vencida (vigenciaVencida): Solo puede ver los registros que ÉL MISMO haya hecho (v.uidg === myuid).
+  const visitasPermitidasPorRol = visitas.filter((v) => {
+    if (esPx) return v.tipo === 'PROCEDIMIENTO';
+    if (vigenciaVencida) return v.uidg === myuid;
+    return true;
+  });
 
   const visitasFiltradas = visitasPermitidasPorRol.filter((v) => {
     const coincideTipo = esPx ? v.tipo === 'PROCEDIMIENTO' : (filtroTipo === "TODOS" || v.tipo === filtroTipo);
@@ -406,6 +432,20 @@ const Consulta = () => {
   return (
     <div className='visita-container'>
       
+      {/* BANNER DE MODO VIGENCIA VENCIDA */}
+      {vigenciaVencida && !esPx && (
+        <div style={{
+          backgroundColor: '#fff3cd', color: '#856404', border: '1px solid #ffeeba',
+          borderRadius: '10px', padding: '12px 16px', marginBottom: '18px',
+          display: 'flex', alignItems: 'center', gap: '10px'
+        }}>
+          <FaLock />
+          <span>
+            <strong>Modo Solo Lectura (Vigencia Vencida):</strong> Solo se muestran los registros realizados por ti. No puedes agregar, editar ni eliminar información.
+          </span>
+        </div>
+      )}
+
       {/* HEADER */}
       <div className='visita-header'>
         <Link to={`/px/${id}`} className='btn-regresar'>
@@ -416,8 +456,8 @@ const Consulta = () => {
             {esPx ? <><FaSyringe /> Mis Procedimientos</> : <><GoBook /> Visita Médica</>}
           </h2>
 
-          {/* El botón Añadir Visita solo es visible para personal clínico */}
-          {!esPx && visitasPermitidasPorRol.length > 0 && (
+          {/* El botón Añadir Visita se oculta si es Paciente o si tiene la Vigencia Vencida */}
+          {!esPx && !vigenciaVencida && visitasPermitidasPorRol.length > 0 && (
             <button onClick={() => setIsSelectorOpen(true)} className='btn-anadir-top'>
               <FaPlus /> Añadir Visita
             </button>
@@ -429,10 +469,9 @@ const Consulta = () => {
       {visitasPermitidasPorRol.length > 0 && (
         <div className='filtros-panel'>
           
-          {/* Las pestañas de Notas Médicas y Enfermería solo las ve el personal clínico */}
           {!esPx && (
             <div className='visita-tabs'>
-              <button className={filtroTipo === 'TODOS' ? 'tab-active' : ''} onClick={() => setFiltroTipo('TODOS')}>Todos ({visitas.length})</button>
+              <button className={filtroTipo === 'TODOS' ? 'tab-active' : ''} onClick={() => setFiltroTipo('TODOS')}>Todos ({visitasPermitidasPorRol.length})</button>
               <button className={filtroTipo === 'MEDICA' ? 'tab-active' : ''} onClick={() => setFiltroTipo('MEDICA')}><FaUserMd/> Notas Médicas</button>
               <button className={filtroTipo === 'ENFERMERIA' ? 'tab-active' : ''} onClick={() => setFiltroTipo('ENFERMERIA')}><FaUserNurse/> Enfermería</button>
               <button className={filtroTipo === 'PROCEDIMIENTO' ? 'tab-active' : ''} onClick={() => setFiltroTipo('PROCEDIMIENTO')}><FaSyringe/> Procedimientos</button>
@@ -470,13 +509,19 @@ const Consulta = () => {
       {visitasPermitidasPorRol.length === 0 ? (
         <div className='empty-state'>
           {esPx ? <FaSyringe className='empty-icon' /> : <GoBook className='empty-icon' />}
-          <h3>{esPx ? 'No tienes procedimientos registrados' : 'No existe información de visitas médicas'}</h3>
+          <h3>
+            {esPx 
+              ? 'No tienes procedimientos registrados' 
+              : (vigenciaVencida ? 'No tienes registros propios en este paciente' : 'No existe información de visitas médicas')}
+          </h3>
           <p>
             {esPx 
               ? 'Cuando el personal médico o de enfermería registre un procedimiento en tu expediente, podrás consultarlo aquí.' 
-              : 'Este paciente aún no cuenta con notas médicas, registros de enfermería ni procedimientos.'}
+              : (vigenciaVencida 
+                  ? 'Con vigencia vencida solo puedes visualizar registros que hayan sido creados por ti.' 
+                  : 'Este paciente aún no cuenta con notas médicas, registros de enfermería ni procedimientos.')}
           </p>
-          {!esPx && (
+          {!esPx && !vigenciaVencida && (
             <button onClick={() => setIsSelectorOpen(true)} className='btn-agregar-main'>
               <FaPlus /> Añadir Visita
             </button>
@@ -557,7 +602,6 @@ const Consulta = () => {
                     </button>
                   )}
 
-                  {/* BOTÓN PARA IMPRIMIR PLAN / RECETA (Únicamente para Médicos) */}
                   {item.tipo === 'MEDICA' && !estaBloqueadoPorOculto && esMedico && (
                     <button 
                       onClick={() => abrirVistaPreviaReceta(item)} 
@@ -569,7 +613,8 @@ const Consulta = () => {
                     </button>
                   )}
 
-                  {esAutor && (
+                  {/* Si la vigencia está vencida, NO puede editar, borrar ni cambiar visibilidad */}
+                  {esAutor && !vigenciaVencida && (
                     <>
                       {item.tipo === 'MEDICA' && (
                         <button 
@@ -597,8 +642,8 @@ const Consulta = () => {
         </div>
       )}
 
-      {/* MODAL 1: SELECTOR DE TIPO (Solo Personal Clínico) */}
-      {!esPx && isSelectorOpen && (
+      {/* MODAL 1: SELECTOR DE TIPO (Oculto si la vigencia está vencida) */}
+      {!esPx && !vigenciaVencida && isSelectorOpen && (
         <div className='modal-overlay'>
           <div className='modal-selector-content'>
             <div className='modal-header'>
@@ -673,7 +718,7 @@ const Consulta = () => {
                             : 'Nota PÚBLICA (Visible en el expediente clínico).'}
                         </p>
                       </div>
-                      {!isReadOnly && (
+                      {!isReadOnly && !vigenciaVencida && (
                         <button 
                           type="button" 
                           onClick={() => setFormData({ ...formData, oculto: !formData.oculto })}
@@ -784,7 +829,7 @@ const Consulta = () => {
                 <button type="button" onClick={() => setIsFormOpen(false)} className='btn-cancelar'>
                   {isReadOnly ? 'Cerrar' : 'Cancelar'}
                 </button>
-                {!isReadOnly && !esPx && (
+                {!isReadOnly && !esPx && !vigenciaVencida && (
                   <button type="submit" className='btn-guardar'>
                     <FaSave /> {isEditing ? 'Actualizar Cambios' : 'Guardar Registro'}
                   </button>

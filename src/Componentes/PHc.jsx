@@ -10,6 +10,12 @@ const PHc = () => {
   const { id } = useParams(); // UID del paciente
   const myuid = auth.currentUser?.uid; // UID del médico
 
+  const vigenciaVencida = localStorage.getItem('vigenciaVencida') === 'true';
+  // Filtra por el campo donde guardas el UID del autor (uidg / uidMedico / uidAutor)
+const listaVisible = vigenciaVencida 
+  ? registros.filter(item => (item.uidg || item.uidMedico || item.uid) === myuid)
+  : registros;
+
   const [historias, setHistorias] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [nombreMedico, setNombreMedico] = useState("");

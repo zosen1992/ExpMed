@@ -394,27 +394,15 @@ const TopBar = () => {
               // 1. Evaluar si faltan 7, 3, 1 días o tiene 2 días vencido para generar notificación
               await evaluarYNotificarVigenciaUsuario(user.uid, datos, rama);
 
-              // 2. Validar bloqueo de sesión si ya venció
+              // 2. Actualizar estado de Vigencia Vencida (sin expulsar al usuario, activando modo restringido)
               const fechaLimite = parsearFechaVigencia(datos.vigencia);
               const ahora = new Date();
+              const vencida = !fechaLimite || ahora > fechaLimite;
 
-              if (!fechaLimite || ahora > fechaLimite) {
-                setUserInfo(null);
-                setCurrentUid(null);
-                localStorage.removeItem('rolActivo');
-                await signOut(auth);
-
-                if (!alertaVigenciaMostrada.current) {
-                  alertaVigenciaMostrada.current = true;
-                  alert(
-                    `⛔ Sesión finalizada: La vigencia de tu cuenta (${datos.vigencia || 'Sin vigencia'}) se ha superado.\n\n` +
-                    `Contacta al Administrador para renovar tu acceso.`
-                  );
-                  setTimeout(() => { alertaVigenciaMostrada.current = false; }, 2000);
-                }
-                navigate('/login', { replace: true });
-                return;
-              }
+              localStorage.setItem('vigenciaVencida', vencida ? 'true' : 'false');
+              window.dispatchEvent(new Event('vigenciaActualizada'));
+            } else {
+              localStorage.setItem('vigenciaVencida', 'false');
             }
 
             setUserInfo(datos);
@@ -584,7 +572,10 @@ const TopBar = () => {
         </div>
         {userInfo.vigencia && (
           <div style={itemStyle}>
-            <strong>Vigencia:</strong> <span>{userInfo.vigencia}</span>
+            <strong>Vigencia:</strong>{' '}
+            <span style={localStorage.getItem('vigenciaVencida') === 'true' ? { backgroundColor: '#c0392b', padding: '2px 8px', borderRadius: '8px', fontWeight: 'bold' } : {}}>
+              {userInfo.vigencia} {localStorage.getItem('vigenciaVencida') === 'true' ? '(VENCIDA - SOLO LECTURA)' : ''}
+            </span>
           </div>
         )}
       </div>
