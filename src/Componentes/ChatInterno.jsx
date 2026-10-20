@@ -1,18 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { auth, db } from '../firebase';
-import { ref, onValue, set, push, update, get } from 'firebase/database';
+import { ref, onValue, set, push, update, get, remove } from 'firebase/database';
 import { 
   FaArrowLeft, FaPaperPlane, FaPlus, FaSearch, FaCheck, 
   FaCheckDouble, FaUserMd, FaUserNurse, FaUserInjured, 
   FaTimes, FaCheckCircle, FaTimesCircle, FaLock, 
   FaFolderOpen, FaBan, FaRedo, FaComments, FaClock, 
   FaExclamationCircle, FaUserPlus, FaFilePrescription, 
-  FaPrint, FaHistory, FaNotesMedical, FaLeaf 
+  FaPrint, FaHistory, FaNotesMedical, FaLeaf, FaTrashAlt
 } from 'react-icons/fa';
 import { estaVigenciaVencida } from '../utilidades/verificadorVigencia';
 import ModalReceta from './ModalReceta';
 import '../Estilos/ChatInterno.css';
+
 
 const RESPUESTAS_RAPIDAS_PERSONAL = [
   "Hola, he revisado tu mensaje.",
@@ -798,6 +799,33 @@ const ChatInterno = () => {
     }
   };
 
+  // Eliminar un mensaje propio enviado en el chat
+  const handleEliminarMiMensaje = async (msgItem) => {
+    if (!chatActivoId || !msgItem?.id || msgItem.emisorUid !== myuid) return;
+    if (vigenciaVencida && esPersonalSalud) {
+      return alert("⛔ Modo de solo lectura: No puedes eliminar mensajes con vigencia vencida.");
+    }
+
+    const confirmar = window.confirm("¿Deseas eliminar este mensaje que enviaste?");
+    if (!confirmar) return;
+
+    try {
+      await remove(ref(db, `chats/${chatActivoId}/mensajes/${msgItem.id}`));
+
+      // Actualizar la vista previa del último mensaje en la barra lateral
+      const restantes = mensajes.filter((m) => m.id !== msgItem.id);
+      const ultimo = restantes.length > 0 ? restantes[restantes.length - 1] : null;
+
+      await update(ref(db, `chats/${chatActivoId}/info`), {
+        ultimoMensaje: ultimo ? ultimo.texto : 'Mensaje eliminado',
+        ultimaFecha: ultimo ? ultimo.fecha : chatActivoObj.ultimaFecha
+      });
+    } catch (error) {
+      console.error("Error al eliminar mensaje:", error);
+      alert("No se pudo eliminar el mensaje.");
+    }
+  };
+
   const handleResponderSolicitud = async (decision) => {
     if (!chatActivoObj || !otroUid) return;
     if (vigenciaVencida) {
@@ -1291,14 +1319,35 @@ const ChatInterno = () => {
                             <p className="msg-text">{m.texto}</p>
                           )}
 
-                          <div className="msg-meta">
+                        <div className="msg-meta">
                             <span>{m.fecha}</span>
                             {esMio && (
-                              <span className={`msg-check ${m.leido ? 'leido' : ''}`}>
-                                {m.leido ? <FaCheckDouble title="Leído" /> : <FaCheck title="Enviado" />}
-                              </span>
+                              <>
+                                <span className={`msg-check ${m.leido ? 'leido' : ''}`}>
+                                  {m.leido ? <FaCheckDouble title="Leído" /> : <FaCheck title="Enviado" />}
+                                </span>
+                                {(!vigenciaVencida || esPx) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleEliminarMiMensaje(m)}
+                                    title="Eliminar este mensaje"
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      color: 'rgba(255,255,255,0.85)',
+                                      cursor: 'pointer',
+                                      padding: '0 0 0 6px',
+                                      fontSize: '0.74rem',
+                                      display: 'inline-flex',
+                                      alignItems: 'center'
+                                    }}
+                                  >
+                                    <FaTrashAlt />
+                                  </button>
+                                )}
+                              </>
                             )}
-                          </div>
+                          </div>    
                         </div>
                       </div>
                     );

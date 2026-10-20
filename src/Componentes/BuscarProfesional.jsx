@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { auth, db } from '../firebase';
-import { ref, get, set } from 'firebase/database';
+import { ref, get, set, update } from 'firebase/database';
 import { 
   FaArrowLeft, FaSearch, FaMapMarkerAlt, FaUserMd, 
   FaUserNurse, FaStar, FaPhoneAlt, FaGraduationCap, 
@@ -20,13 +20,14 @@ const BuscarProfesional = () => {
 
   const [profesionales, setProfesionales] = useState([]);
   const [misMedicosSet, setMisMedicosSet] = useState(new Set());
+  const [misCalificacionesDadas, setMisCalificacionesDadas] = useState({});
   const [datosPaciente, setDatosPaciente] = useState({});
   const [cargando, setCargando] = useState(true);
 
   // Filtros
   const [busqueda, setBusqueda] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('');
-  const [filtroCategoria, setFiltroCategoria] = useState('TODOS'); // 'TODOS' | 'medico' | 'enfermeria'
+  const [filtroCategoria, setFiltroCategoria] = useState('TODOS');
 
   useEffect(() => {
     if (!myuid) return;
@@ -43,7 +44,7 @@ const BuscarProfesional = () => {
           }
         }
 
-        // 2. Verificar qué médicos/enfermeros ya tienen a este paciente asignado en px/[uidProf]/[myuid]
+        // 2. Verificar qué médicos/enfermeros tienen a este paciente asignado en px/[uidProf]/[myuid]
         const snapRelaciones = await get(ref(db, 'px'));
         const setAsignados = new Set();
         if (snapRelaciones.exists()) {
@@ -56,7 +57,20 @@ const BuscarProfesional = () => {
         }
         setMisMedicosSet(setAsignados);
 
-        // 3. Cargar profesionales públicos de usuarios/medico y usuarios/enfermeria
+        // 3. Consultar calificaciones previas otorgadas por este paciente
+        const snapCalifs = await get(ref(db, 'calificaciones'));
+        const mapaMisVotos = {};
+        if (snapCalifs.exists()) {
+          const califsVal = snapCalifs.val();
+          Object.keys(califsVal).forEach((uidProf) => {
+            if (califsVal[uidProf] && califsVal[uidProf][myuid]) {
+              mapaMisVotos[uidProf] = Number(califsVal[uidProf][myuid].estrellas || califsVal[uidProf][myuid]);
+            }
+          });
+        }
+        setMisCalificacionesDadas(mapaMisVotos);
+
+        // 4. Cargar profesionales públicos de usuarios/medico y usuarios/enfermeria
         const snapUsuarios = await get(ref(db, 'usuarios'));
         if (snapUsuarios.exists()) {
           const ramas = snapUsuarios.val();
@@ -76,11 +90,12 @@ const BuscarProfesional = () => {
                 if (uidsAgregados.has(uidProf)) return;
                 const u = ramas[nodo][uidProf];
                 const esOculto = u.oculto === true || u.visibilidad === 'oculto';
-                if (esOculto) return; // Respetar privacidad de perfiles ocultos
+                if (esOculto) return;
 
                 uidsAgregados.add(uidProf);
                 lista.push({
                   uid: uidProf,
+                  nodoOriginal: nodo,
                   nombre: u.nombre || u.nombrecom || 'Profesional de Salud',
                   rol: rolNorm,
                   rolEtiqueta: etiqueta,
@@ -113,9 +128,62 @@ const BuscarProfesional = () => {
     cargarDirectorioProfesionales();
   }, [myuid]);
 
+  // Calificar a un profesional tratante (Solo disponible si es médico/enfermero del paciente)
+  const handleCalificarProfesional = async (prof, estrellasSeleccionadas) => {
+    if (!myuid || !prof?.uid) return;
+    if (!misMedicosSet.has(prof.uid)) {
+      return alert("Solo puedes calificar a los profesionales de salud con los que llevas atención o estás registrado como paciente.");
+    }
+
+    try {
+      // 1. Guardar la calificación de este paciente en calificaciones/[uidProf]/[myuid]
+      await set(ref(db, `calificaciones/${prof.uid}/${myuid}`), {
+        uidPx: myuid,
+        estrellas: estrellasSeleccionadas,
+        fecha: new Date().toISOString()
+      });
+
+      // 2. Recalcular el promedio de todas las calificaciones recibidas por este profesional
+      const snapTodosVotos = await get(ref(db, `calificaciones/${prof.uid}`));
+      let nuevoPromedio = estrellasSeleccionadas;
+
+      if (snapTodosVotos.exists()) {
+        const votosObj = snapTodosVotos.val();
+        const valores = Object.values(votosObj)
+          .map((v) => Number(typeof v === 'object' ? v.estrellas : v))
+          .filter((n) => !isNaN(n) && n >= 1 && n <= 5);
+
+        if (valores.length > 0) {
+          const suma = valores.reduce((acc, curr) => acc + curr, 0);
+          nuevoPromedio = Number((suma / valores.length).toFixed(1));
+        }
+      }
+
+      // 3. Actualizar la calificación promedio en el nodo del profesional y en su objeto en memoria
+      const nodoDestino = prof.nodoOriginal || prof.rol;
+      await update(ref(db, `usuarios/${nodoDestino}/${prof.uid}`), {
+        calificacion: nuevoPromedio,
+         [`calificaciones_px/${myuid}`]: estrellasSeleccionadas
+      });
+
+      setMisCalificacionesDadas((prev) => ({
+        ...prev,
+        [prof.uid]: estrellasSeleccionadas
+      }));
+
+      setProfesionales((prev) =>
+        prev.map((item) =>
+          item.uid === prof.uid ? { ...item, calificacion: nuevoPromedio } : item
+        )
+      );
+    } catch (error) {
+      console.error("Error al guardar calificación:", error);
+      alert("No se pudo registrar tu calificación en este momento.");
+    }
+  };
+
   // Acción del botón "Enviar Mensaje"
   const handleIniciarMensajeConProfesional = async (prof) => {
-    //if (!myuid || !prof?.uid) return;
     if (!myuid || !prof?.uid) return;
 
     if (prof.enDescanso) {
@@ -128,7 +196,6 @@ const BuscarProfesional = () => {
 
     const esMiMedico = misMedicosSet.has(prof.uid);
 
-    // Si NO es su médico tratante, mostrar advertencia antes de proceder
     if (!esMiMedico) {
       const confirmar = window.confirm(
         `⚠️ Aviso importante:\n\n` +
@@ -174,7 +241,7 @@ const BuscarProfesional = () => {
           estado: 'pendiente',
           iniciadoPor: myuid,
           aprobadorUid: prof.uid,
-          esPacienteAsignado: esMiMedico, // Indica al médico si ya es su paciente o si es externo
+          esPacienteAsignado: esMiMedico,
           ultimoMensaje: 'Solicitud de conversación pendiente...',
           ultimaFecha: ahoraStr,
           timestamp: Date.now(),
@@ -266,6 +333,7 @@ const BuscarProfesional = () => {
         <div style={gridStyle}>
           {listaFiltrada.map((prof) => {
             const esMiMedico = misMedicosSet.has(prof.uid);
+            const miVotoActual = misCalificacionesDadas[prof.uid] || 0;
 
             return (
               <div key={prof.uid} style={cardStyle}>
@@ -280,8 +348,8 @@ const BuscarProfesional = () => {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '6px' }}>
                         <h3 style={{ margin: 0, fontSize: '1.08rem', color: '#1e293b' }}>{prof.nombre}</h3>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', color: '#f59e0b', fontWeight: 700, fontSize: '0.86rem' }}>
-                          <FaStar /> {prof.calificacion.toFixed(1)}
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', color: '#f59e0b', fontWeight: 700, fontSize: '0.88rem' }}>
+                          <FaStar /> {Number(prof.calificacion).toFixed(1)}
                         </span>
                       </div>
 
@@ -292,7 +360,7 @@ const BuscarProfesional = () => {
 
                         {esMiMedico && (
                           <span style={badgeMiMedicoStyle}>
-                            <FaCheckCircle /> Es tu médico
+                            <FaCheckCircle /> Es tu profesional
                           </span>
                         )}
                       </div>
@@ -322,6 +390,40 @@ const BuscarProfesional = () => {
                       </p>
                     )}
                   </div>
+
+                  {/* SECCIÓN PARA CALIFICAR AL PROFESIONAL (Solo habilitada si es médico/enfermero del paciente) */}
+                  {esMiMedico ? (
+                    <div style={ratingBoxStyle}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1e293b' }}>
+                        {miVotoActual > 0 ? `Tu calificación (${miVotoActual}/5):` : 'Califica a tu profesional:'}
+                      </span>
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        {[1, 2, 3, 4, 5].map((estrella) => (
+                          <button
+                            key={estrella}
+                            type="button"
+                            onClick={() => handleCalificarProfesional(prof, estrella)}
+                            title={`Calificar con ${estrella} estrella${estrella > 1 ? 's' : ''}`}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              fontSize: '1.2rem',
+                              padding: '2px',
+                              color: estrella <= miVotoActual ? '#f59e0b' : '#cbd5e1',
+                              transition: 'transform 0.15s'
+                            }}
+                          >
+                            <FaStar />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ marginTop: '8px', fontSize: '0.75rem', color: '#94a3b8', textAlign: 'center' }}>
+                      Solo sus pacientes registrados pueden calificar a este profesional
+                    </div>
+                  )}
                 </div>
 
                 <button
@@ -400,6 +502,11 @@ const infoBodyStyle = {
 };
 const infoRowStyle = {
   margin: 0, fontSize: '0.84rem', color: '#334155', display: 'flex', alignItems: 'center', gap: '6px'
+};
+const ratingBoxStyle = {
+  marginTop: '10px', backgroundColor: '#fffbeb', border: '1px solid #fde68a',
+  borderRadius: '10px', padding: '8px 12px', display: 'flex',
+  justifyContent: 'space-between', alignItems: 'center'
 };
 const btnMsgDirectoStyle = {
   width: '100%', backgroundColor: '#2ecc71', color: '#ffffff', border: 'none',

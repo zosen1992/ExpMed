@@ -1,19 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { auth, db } from '../firebase';
-import { initializeApp, deleteApp } from 'firebase/app';
-import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
-import { ref, set, push, get } from 'firebase/database';
-import { FaArrowLeft, FaSave, FaLock } from 'react-icons/fa';
+import { ref, set, push } from 'firebase/database';
+import { initializeApp, getApps } from 'firebase/app';
+import { getAuth, createUserWithEmailAndPassword, signOut as signOutSecondary } from 'firebase/auth';
+import { 
+  FaArrowLeft, FaUserPlus, FaCamera, FaUpload, 
+  FaTrashAlt, FaEnvelope, FaLock, FaPhoneAlt, 
+  FaBirthdayCake, FaVenusMars, FaMapMarkerAlt, FaIdCard 
+} from 'react-icons/fa';
 import { ESTADOS_REPUBLICA } from '../constantes/estados';
-
-
-const PASSWORD_DEFAULT = "000000";
 
 const Formularionpx = () => {
   const navigate = useNavigate();
   const myuid = auth.currentUser?.uid;
 
+  const [guardando, setGuardando] = useState(false);
+  const [crearAccesoLogin, setCrearAccesoLogin] = useState(false);
+  const [passwordPx, setPasswordPx] = useState('');
+
+  const [formData, setFormData] = useState({
+    nombre: '',
+    correo: '',
+    num_cel: '',
+    fecha_nac: '',
+    sexo: 'Masculino',
+    direccion: '',
+    localidad: 'Nuevo León',
+    nss: '',
+    fotoperfil: ''
+  });
+
+  // Candado: Si la vigencia está vencida, no permite registrar pacientes nuevos
   useEffect(() => {
     if (localStorage.getItem('vigenciaVencida') === 'true') {
       alert("⛔ Tu vigencia ha vencido. No puedes registrar pacientes nuevos.");
@@ -21,115 +39,115 @@ const Formularionpx = () => {
     }
   }, [navigate]);
 
-
-  const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    nombre: '',
-    correo: '',
-    contras: PASSWORD_DEFAULT,
-    celular: '',
-    fechanacimiento: '',
-    sexo: 'N/A',
-    direccion: '',
-    localidad: '',
-    nss: '',
-    fotoperfil: ''
-  });
-
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    // Impedir cualquier modificación al campo de contraseña
-    if (name === 'contras') return;
     setFormData({
       ...formData,
-      [name]: value
+      [e.target.name]: e.target.value
     });
   };
 
-  // Busca en todas las ramas de usuarios a quién pertenece un correo existente
-  const buscarDuenoDelCorreo = async (correoBuscado) => {
-    const correoLimpio = correoBuscado.trim().toLowerCase();
-    if (!correoLimpio) return null;
+  // Subir foto de perfil seleccionando archivo de imagen
+  const handleSubirFotoPx = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-    const snapUsuarios = await get(ref(db, 'usuarios'));
-    if (!snapUsuarios.exists()) return null;
-
-    const ramas = snapUsuarios.val();
-    const mapaRoles = {
-      medico: 'Médico',
-      enfermeria: 'Enfermería',
-      enfermero: 'Enfermero',
-      enfemero: 'Enfermero',
-      px: 'Paciente',
-      admin: 'Administrador',
-      otro: 'Administrador'
-    };
-
-    for (const nombreRama of Object.keys(ramas)) {
-      const usuariosEnRama = ramas[nombreRama];
-      if (usuariosEnRama && typeof usuariosEnRama === 'object') {
-        for (const uidUsuario of Object.keys(usuariosEnRama)) {
-          const userObj = usuariosEnRama[uidUsuario];
-          const correoUsuario = String(userObj?.correo || '').trim().toLowerCase();
-
-          if (correoUsuario && correoUsuario !== 'nocorreo' && correoUsuario === correoLimpio) {
-            return {
-              nombre: userObj.nombre || userObj.nombrecom || 'Usuario sin nombre',
-              rol: userObj.rol || mapaRoles[nombreRama] || nombreRama
-            };
-          }
-        }
-      }
+    if (!file.type.startsWith('image/')) {
+      e.target.value = '';
+      return alert("Solo se permiten archivos de imagen (PNG, JPG, JPEG, WEBP).");
     }
-    return null;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxDim = 360;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxDim || height > maxDim) {
+          const ratio = Math.min(maxDim / width, maxDim / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+        setFormData((prev) => ({ ...prev, fotoperfil: dataUrl }));
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!myuid) return alert("Error: No hay sesión activa.");
-    
-    if (!formData.localidad) {
-      return alert("Por favor selecciona una Localidad de la lista desplegable.");
+    if (!myuid) return alert("Sesión no válida.");
+    if (localStorage.getItem('vigenciaVencida') === 'true') {
+      return alert("⛔ Tu vigencia está vencida. No puedes agregar pacientes.");
     }
 
-    setLoading(true);
-    let appSecundaria = null;
-
+    setGuardando(true);
     try {
-      // 0. VERIFICAR SI EL CORREO YA EXISTE EN LA BASE DE DATOS E INDICAR NOMBRE Y ROL
-      if (formData.correo.trim()) {
-        const propietarioExistente = await buscarDuenoDelCorreo(formData.correo);
-        if (propietarioExistente) {
-          setLoading(false);
-          return alert(
-            `⚠️ Correo electrónico ya registrado:\n\n` +
-            `Pertenece a: ${propietarioExistente.nombre}\n` +
-            `Rol: ${propietarioExistente.rol.toUpperCase()}`
-          );
+      let nuevoUid = '';
+
+      // Si se marcó crear cuenta con correo y contraseña para que el paciente pueda iniciar sesión
+      if (crearAccesoLogin && formData.correo.trim() && passwordPx.trim()) {
+        if (passwordPx.trim().length < 6) {
+          setGuardando(false);
+          return alert("La contraseña del paciente debe tener al menos 6 caracteres.");
         }
-      }
 
-      let nuevoUid = "";
+        const appName = 'SecondaryAppRegistroPx';
+        const existingApp = getApps().find((a) => a.name === appName);
+        const secondaryApp = existingApp || initializeApp(firebaseConfig, appName);
+        const secondaryAuth = getAuth(secondaryApp);
 
-      // 1. GENERAR USUARIO EN AUTH CON CONTRASEÑA FIJA "000000" (Si ingresó correo)
-      if (formData.correo.trim()) {
-        appSecundaria = initializeApp(auth.app.options, `AppSecundaria_${Date.now()}`);
-        const authSecundario = getAuth(appSecundaria);
-
-        const userCredential = await createUserWithEmailAndPassword(
-          authSecundario,
+        const cred = await createUserWithEmailAndPassword(
+          secondaryAuth,
           formData.correo.trim(),
-          PASSWORD_DEFAULT
+          passwordPx.trim()
         );
-        nuevoUid = userCredential.user.uid;
-
-        await authSecundario.signOut();
-        await deleteApp(appSecundaria);
-        appSecundaria = null;
+        nuevoUid = cred.user.uid;
+        await signOutSecondary(secondaryAuth);
       } else {
-        // 2. GENERAR UID AUTOMÁTICO (Si no ingresó correo)
-        nuevoUid = push(ref(db, 'usuarios/px')).key;
+        // Registro sin cuenta de acceso directo (genera llave única en BD)
+        const refTemp = push(ref(db, 'usuarios/px'));
+        nuevoUid = refTemp.key;
       }
+
+      const objetoPaciente = {
+        uid: nuevoUid,
+        id: nuevoUid,
+        nombre: formData.nombre.trim(),
+        nombrecom: formData.nombre.trim(),
+        correo: formData.correo.trim() || 'nocorreo',
+        num_cel: formData.num_cel.trim(),
+        celular: formData.num_cel.trim(),
+        fecha_nac: formData.fecha_nac,
+        fechanacimiento: formData.fecha_nac,
+        sexo: formData.sexo,
+        direccion: formData.direccion.trim(),
+        localidad: formData.localidad,
+        nss: formData.nss.trim(),
+        fotoperfil: formData.fotoperfil || '',
+        rol: 'px',
+        creadoPor: myuid,
+        fechaRegistro: new Date().toISOString()
+      };
+
+      // 1. Guardar en usuarios/px/[nuevoUid]
+      await set(ref(db, `usuarios/px/${nuevoUid}`), objetoPaciente);
+
+      // 2. Vincular a la lista del médico o enfermero actual: px/[myuid]/[nuevoUid]
+      await set(ref(db, `px/${myuid}/${nuevoUid}`), { uid: nuevoUid });
+
+      // 3. Guardar la foto de perfil en la carpeta fotoperfil/[nuevoUid] con el UID como nombre
       if (formData.fotoperfil) {
         await set(ref(db, `fotoperfil/${nuevoUid}`), {
           uid: nuevoUid,
@@ -140,256 +158,245 @@ const Formularionpx = () => {
         });
       }
 
-      // 3. PREPARAR DATOS RUTA GLOBAL: usuarios/px/[UID]
-      const datosGlobales = {
-        uid: nuevoUid,
-        id: nuevoUid,
-        nombre: formData.nombre || "",
-        nombrecom: formData.nombre || "",
-        correo: formData.correo.trim() || "nocorreo",
-        contras: PASSWORD_DEFAULT,
-        num_cel: formData.celular || "",
-        celular: formData.celular || "",
-        fecha_nac: formData.fechanacimiento || "",
-        fechanacimiento: formData.fechanacimiento || "",
-        sexo: formData.sexo || "N/A",
-        direccion: formData.direccion || "",
-        localidad: formData.localidad || "",
-        nss: formData.nss || "N/A",
-        fotoperfil: formData.fotoperfil || "",
-        rol: "px",
-        
-      };
-
-      // 4. GUARDAR EN AMBAS RUTAS
-      await set(ref(db, `usuarios/px/${nuevoUid}`), datosGlobales);
-      await set(ref(db, `px/${myuid}/${nuevoUid}`), { uid: nuevoUid });
-
-      alert(`¡Paciente registrado correctamente!\nContraseña asignada por defecto: ${PASSWORD_DEFAULT}`);
-      navigate('/listapx');
-
+      alert("¡Paciente registrado y vinculado a tu lista exitosamente!");
+      navigate(`/px/${nuevoUid}`);
     } catch (error) {
       console.error("Error al registrar paciente:", error);
-      if (appSecundaria) {
-        try { await deleteApp(appSecundaria); } catch (err) { console.error(err); }
-      }
-
       if (error.code === 'auth/email-already-in-use') {
-        const propietario = await buscarDuenoDelCorreo(formData.correo);
-        if (propietario) {
-          alert(
-            `⚠️ El correo electrónico ya está en uso.\n\n` +
-            `Pertenece a: ${propietario.nombre}\n` +
-            `Rol: ${propietario.rol.toUpperCase()}`
-          );
-        } else {
-          alert("El correo electrónico ingresado ya está registrado en Firebase Authentication.");
-        }
-      } else if (error.code === 'auth/invalid-email') {
-        alert("El formato del correo electrónico no es válido.");
+        alert("Ese correo electrónico ya está registrado en el sistema. Puedes buscar al paciente en el buscador de 'Mis Pacientes' para agregarlo a tu lista.");
       } else {
-        alert("Ocurrió un error al registrar al paciente: " + error.message);
+        alert("Ocurrió un error al registrar al paciente: " + (error.message || ''));
       }
     } finally {
-      setLoading(false);
+      setGuardando(false);
     }
   };
 
-  return (
-    <div style={containerStyle}>
-      <div style={cardStyle}>
-        <Link to="/listapx" style={backLinkStyle}>
-          <FaArrowLeft /> Volver a mis pacientes
-        </Link>
+  const avatarDefault = 'https://cdn-icons-png.flaticon.com/512/387/387561.png';
 
-        <h2 style={{ textAlign: 'center', color: '#2c3e50', marginBottom: '20px' }}>
-          Registrar Nuevo Paciente
+  return (
+    <div style={{ maxWidth: '820px', margin: '30px auto', padding: '0 20px', fontFamily: 'Segoe UI, sans-serif' }}>
+      <div style={{ marginBottom: '20px' }}>
+        <Link to="/listapx" style={btnBackStyle}>
+          <FaArrowLeft /> Regresar a Mis Pacientes
+        </Link>
+      </div>
+
+      <div style={cardStyle}>
+        <h2 style={{ marginTop: 0, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '2px solid #f1f5f9', paddingBottom: '12px' }}>
+          <FaUserPlus style={{ color: '#2ecc71' }} /> Registrar Nuevo Paciente
         </h2>
 
-        <form onSubmit={handleSubmit} style={formStyle}>
-          <div style={fieldGroup}>
-            <label style={labelStyle}>Nombre Completo *</label>
+        <form onSubmit={handleSubmit} style={gridFormStyle}>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Nombre Completo del Paciente *</label>
             <input
               type="text"
               name="nombre"
               value={formData.nombre}
               onChange={handleChange}
+              placeholder="Ej. María López Hernández"
               required
               style={inputStyle}
-              placeholder="Nombre y apellidos"
             />
-            
           </div>
 
-          <div style={rowTwoCols}>
-            <div style={fieldGroup}>
-              <label style={labelStyle}>Correo Electrónico</label>
-              <input
-                type="email"
-                name="correo"
-                value={formData.correo}
-                onChange={handleChange}
-                style={inputStyle}
-                placeholder="ejemplo@correo.com"
-              />
-            </div>
-
-            <div style={fieldGroup}>
-              <label style={labelStyle}><FaLock style={{ fontSize: '0.75rem' }} /> Contraseña (Fija)</label>
-              <input
-                type="text"
-                name="contras"
-                value={PASSWORD_DEFAULT}
-                readOnly
-                disabled
-                style={lockedInputStyle}
-                title="Contraseña por defecto no modificable"
-              />
-            </div>
-          </div>
-          <small style={{ color: '#7f8c8d', textAlign: 'center', marginTop: '-8px' }}>
-            La contraseña por defecto para todos los usuarios es <strong>000000</strong> (no modificable).
-          </small>
-
-          <div style={rowTwoCols}>
-            <div style={fieldGroup}>
-              <label style={labelStyle}>Celular</label>
-              <input
-                type="text"
-                name="celular"
-                value={formData.celular}
-                onChange={handleChange}
-                style={inputStyle}
-                placeholder="10 dígitos"
-              />
-            </div>
-
-            <div style={fieldGroup}>
-              <label style={labelStyle}>Sexo</label>
-              <select
-                name="sexo"
-                value={formData.sexo}
-                onChange={handleChange}
-                style={inputStyle}
-              >
-                <option value="N/A">Sin especificar</option>
-                <option value="Masculino">Masculino</option>
-                <option value="Femenino">Femenino</option>
-              </select>
-            </div>
-          </div>
-
-          <div style={fieldGroup}>
-            <label style={labelStyle}>Fecha de Nacimiento</label>
+          <div style={fieldStyle}>
+            <label style={labelStyle}><FaBirthdayCake /> Fecha de Nacimiento *</label>
             <input
               type="date"
-              name="fechanacimiento"
-              value={formData.fechanacimiento}
+              name="fecha_nac"
+              value={formData.fecha_nac}
               onChange={handleChange}
+              required
               style={inputStyle}
             />
           </div>
 
-          <div style={rowTwoCols}>
-            <div style={fieldGroup}>
-              <label style={labelStyle}>Dirección</label>
-              <input
-                type="text"
-                name="direccion"
-                value={formData.direccion}
-                onChange={handleChange}
-                style={inputStyle}
-                placeholder="Calle, número, colonia"
-              />
-            </div>
-
-            <div style={fieldGroup}>
-              <label style={labelStyle}>Localidad (Estado) *</label>
-              <select
-                name="localidad"
-                value={formData.localidad}
-                onChange={handleChange}
-                required
-                style={inputStyle}
-              >
-                <option value="">Seleccione un estado...</option>
-                {ESTADOS_REPUBLICA.map((estado) => (
-                  <option key={estado} value={estado}>{estado}</option>
-                ))}
-              </select>
-            </div>
+          <div style={fieldStyle}>
+            <label style={labelStyle}><FaVenusMars /> Sexo *</label>
+            <select name="sexo" value={formData.sexo} onChange={handleChange} style={inputStyle}>
+              <option value="Masculino">Masculino</option>
+              <option value="Femenino">Femenino</option>
+            </select>
           </div>
 
-          <div style={fieldGroup}>
-            <label style={labelStyle}>NSS (Número de Seguridad Social)</label>
+          <div style={fieldStyle}>
+            <label style={labelStyle}><FaPhoneAlt /> Teléfono / Celular</label>
+            <input
+              type="text"
+              name="num_cel"
+              value={formData.num_cel}
+              onChange={handleChange}
+              placeholder="Ej. 8112345678"
+              style={inputStyle}
+            />
+          </div>
+
+          <div style={fieldStyle}>
+            <label style={labelStyle}><FaMapMarkerAlt /> Estado / Localidad *</label>
+            <select name="localidad" value={formData.localidad} onChange={handleChange} style={inputStyle} required>
+              <option value="">Seleccione un estado...</option>
+              {ESTADOS_REPUBLICA.map((estado) => (
+                <option key={estado} value={estado}>{estado}</option>
+              ))}
+            </select>
+          </div>
+
+          <div style={fieldStyle}>
+            <label style={labelStyle}><FaMapMarkerAlt /> Dirección</label>
+            <input
+              type="text"
+              name="direccion"
+              value={formData.direccion}
+              onChange={handleChange}
+              placeholder="Calle, número, colonia..."
+              style={inputStyle}
+            />
+          </div>
+
+          <div style={fieldStyle}>
+            <label style={labelStyle}><FaIdCard /> NSS (Seguridad Social - Opcional)</label>
             <input
               type="text"
               name="nss"
               value={formData.nss}
               onChange={handleChange}
+              placeholder="Número de Seguridad Social"
               style={inputStyle}
-              placeholder="Opcional"
             />
           </div>
 
-          <div style={fieldGroup}>
-            <label style={labelStyle}>URL Foto de Perfil</label>
+          <div style={fieldStyle}>
+            <label style={labelStyle}><FaEnvelope /> Correo Electrónico</label>
             <input
-              type="text"
-              name="fotoperfil"
-              value={formData.fotoperfil}
+              type="email"
+              name="correo"
+              value={formData.correo}
               onChange={handleChange}
+              placeholder="paciente@ejemplo.com"
+              required={crearAccesoLogin}
               style={inputStyle}
-              placeholder="https://..."
             />
           </div>
 
-          
+          {/* OPCIÓN PARA CREAR ACCESO DE LOGIN AL PACIENTE */}
+          <div style={{ gridColumn: '1 / -1', backgroundColor: '#f8fafc', padding: '14px 16px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontWeight: 600, color: '#1e293b' }}>
+              <input
+                type="checkbox"
+                checked={crearAccesoLogin}
+                onChange={(e) => setCrearAccesoLogin(e.target.checked)}
+                style={{ width: '18px', height: '18px' }}
+              />
+              Habilitar contraseña para que el paciente pueda iniciar sesión desde su celular/PC
+            </label>
 
-          <button type="submit" disabled={loading} style={submitBtnStyle}>
-            <FaSave /> {loading ? 'Verificando y guardando...' : 'Guardar Paciente'}
-          </button>
+            {crearAccesoLogin && (
+              <div style={{ marginTop: '12px', maxWidth: '360px' }}>
+                <label style={labelStyle}><FaLock /> Contraseña para el Paciente (mín. 6 caracteres) *</label>
+                <input
+                  type="password"
+                  value={passwordPx}
+                  onChange={(e) => setPasswordPx(e.target.value)}
+                  placeholder="••••••"
+                  required={crearAccesoLogin}
+                  style={inputStyle}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* FOTO DE PERFIL (ARCHIVO O URL) */}
+          <div style={{ ...fieldStyle, gridColumn: '1 / -1' }}>
+            <label style={labelStyle}><FaCamera /> Foto de Perfil del Paciente (Opcional)</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', marginBottom: '8px' }}>
+              <label style={{
+                backgroundColor: '#3498db', color: '#fff', padding: '9px 15px',
+                borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '0.88rem',
+                display: 'inline-flex', alignItems: 'center', gap: '6px'
+              }}>
+                <FaUpload /> Seleccionar imagen
+                <input type="file" accept="image/*" onChange={handleSubirFotoPx} style={{ display: 'none' }} />
+              </label>
+
+              <input
+                type="text"
+                name="fotoperfil"
+                value={formData.fotoperfil && !formData.fotoperfil.startsWith('data:image') ? formData.fotoperfil : ''}
+                onChange={handleChange}
+                style={{ ...inputStyle, flex: 1, minWidth: '220px' }}
+                placeholder="O pega aquí la URL de la imagen (https://...)"
+              />
+
+              {formData.fotoperfil && (
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, fotoperfil: '' })}
+                  style={{
+                    backgroundColor: '#fceceb', color: '#e74c3c', border: '1px solid #f5b7b1',
+                    padding: '9px 14px', borderRadius: '8px', cursor: 'pointer', fontWeight: 600,
+                    display: 'inline-flex', alignItems: 'center', gap: '6px'
+                  }}
+                >
+                  <FaTrashAlt /> Quitar
+                </button>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <img
+                src={formData.fotoperfil || avatarDefault}
+                alt="Vista previa"
+                style={{ width: '54px', height: '54px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #3498db' }}
+              />
+              <span style={{ fontSize: '0.84rem', color: '#64748b' }}>
+                Se guardará con el UID del paciente en <code>fotoperfil/[uid]</code>
+              </span>
+            </div>
+          </div>
+
+          <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '10px' }}>
+            <Link to="/listapx" style={btnCancelStyle}>Cancelar</Link>
+            <button type="submit" disabled={guardando} style={btnSaveStyle}>
+              <FaUserPlus /> {guardando ? 'Registrando...' : 'Guardar Paciente'}
+            </button>
+          </div>
         </form>
       </div>
     </div>
   );
 };
 
-const containerStyle = {
-  display: 'flex', justifyContent: 'center', padding: '30px 15px', fontFamily: 'Segoe UI, Roboto, sans-serif'
+const btnBackStyle = {
+  display: 'inline-flex', alignItems: 'center', gap: '8px',
+  color: '#3498db', textDecoration: 'none', fontWeight: 600,
+  padding: '8px 14px', backgroundColor: '#e8f4fd', borderRadius: '8px'
 };
 const cardStyle = {
-  background: '#fff', width: '100%', maxWidth: '480px', padding: '28px',
-  borderRadius: '14px', boxShadow: '0 4px 16px rgba(0,0,0,0.06)', border: '1px solid #e1e8ed'
+  backgroundColor: '#fff', padding: '28px', borderRadius: '16px',
+  border: '1px solid #e2e8f0', boxShadow: '0 4px 15px rgba(0,0,0,0.04)'
 };
-const backLinkStyle = {
-  display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#3498db',
-  textDecoration: 'none', fontSize: '0.9rem', fontWeight: '600', marginBottom: '10px'
+const gridFormStyle = {
+  display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px'
 };
-const formStyle = {
-  display: 'flex', flexDirection: 'column', gap: '14px'
-};
-const rowTwoCols = {
-  display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px'
-};
-const fieldGroup = {
-  display: 'flex', flexDirection: 'column', gap: '5px'
-};
+const fieldStyle = { display: 'flex', flexDirection: 'column', gap: '6px' };
 const labelStyle = {
-  fontSize: '0.85rem', fontWeight: '600', color: '#555', textAlign: 'center'
+  fontSize: '0.85rem', fontWeight: 600, color: '#334155',
+  display: 'flex', alignItems: 'center', gap: '6px'
 };
 const inputStyle = {
-  padding: '10px 12px', borderRadius: '8px', border: '1px solid #ccd1d1',
-  fontSize: '0.92rem', outline: 'none', width: '100%', boxSizing: 'border-box', backgroundColor: '#fff'
+  padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1',
+  fontSize: '0.95rem', color: '#1e293b', backgroundColor: '#fff'
 };
-const lockedInputStyle = {
-  ...inputStyle, backgroundColor: '#e9ecef', color: '#495057',
-  fontWeight: 'bold', textAlign: 'center', cursor: 'not-allowed'
+const btnCancelStyle = {
+  backgroundColor: '#f1f5f9', color: '#475569', textDecoration: 'none',
+  padding: '10px 18px', borderRadius: '8px', fontWeight: 600, display: 'inline-flex', alignItems: 'center'
 };
-const submitBtnStyle = {
-  backgroundColor: '#2ecc71', color: '#fff', border: 'none', padding: '12px',
-  borderRadius: '8px', fontSize: '1rem', fontWeight: '600', cursor: 'pointer',
-  display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '8px'
+const btnSaveStyle = {
+  backgroundColor: '#2ecc71', color: '#fff', border: 'none',
+  padding: '10px 22px', borderRadius: '8px', fontWeight: 700,
+  cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px'
 };
 
 export default Formularionpx;
