@@ -2,42 +2,21 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { auth, db } from '../firebase';
 import { ref, onValue, get, update } from 'firebase/database';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { onAuthStateChanged } from 'firebase/auth';
 import { 
   FaBell, FaExclamationTriangle, FaTimes, 
-  FaBirthdayCake, FaVenusMars, FaPhoneAlt, FaCalendarTimes 
+  FaBirthdayCake, FaVenusMars, FaPhoneAlt, 
+  FaCalendarTimes, FaComments 
 } from 'react-icons/fa';
 import { PiSealWarningDuotone } from "react-icons/pi";
 import { 
   evaluarYNotificarVigenciaUsuario, 
-  verificarVigenciasGlobalmente 
+  verificarVigenciasGlobalmente,
+  estaVigenciaVencida
 } from '../utilidades/verificadorVigencia';
+import { verificarCitasDeUsuario } from '../utilidades/verificadorCitas';
 
-const parsearFechaVigencia = (fechaStr) => {
-  if (!fechaStr || typeof fechaStr !== 'string') return null;
-  const limpio = fechaStr.trim();
-  if (!limpio || limpio.toUpperCase() === 'N/A') return null;
-
-  let anio, mes, dia;
-  if (limpio.includes('/')) {
-    const partes = limpio.split('/');
-    if (partes.length === 3) {
-      if (partes[0].length === 4) [anio, mes, dia] = partes.map(Number);
-      else [dia, mes, anio] = partes.map(Number);
-    }
-  } else if (limpio.includes('-')) {
-    const partes = limpio.split('-');
-    if (partes.length === 3) {
-      if (partes[0].length === 4) [anio, mes, dia] = partes.map(Number);
-      else [dia, mes, anio] = partes.map(Number);
-    }
-  }
-
-  if (!anio || !mes || !dia) return null;
-  const fecha = new Date(anio, mes - 1, dia, 23, 59, 59, 999);
-  return isNaN(fecha.getTime()) ? null : fecha;
-};
-
+// 1. Generador de WAV para la ALARMA CLÍNICA (Signos Vitales)
 const crearUrlAudioAlarma = () => {
   try {
     const sampleRate = 22050;
@@ -82,6 +61,49 @@ const crearUrlAudioAlarma = () => {
   }
 };
 
+// 2. Generador de WAV exclusivo para MENSAJE DE CHAT ENTRANTE (Tono suave de burbuja/chime)
+const crearUrlAudioChat = () => {
+  try {
+    const sampleRate = 22050;
+    const duration = 0.48;
+    const numSamples = Math.floor(sampleRate * duration);
+    const buffer = new ArrayBuffer(44 + numSamples * 2);
+    const view = new DataView(buffer);
+
+    const writeString = (offset, str) => {
+      for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+    };
+
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + numSamples * 2, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    writeString(36, 'data');
+    view.setUint32(40, numSamples * 2, true);
+
+    for (let i = 0; i < numSamples; i++) {
+      const t = i / sampleRate;
+      // Dos notas suaves ascendentes: Mi5 (659.25 Hz) -> La5 (880 Hz)
+      let freq = t < 0.16 ? 587.33 : 880;
+      const env = t < 0.16 ? (1 - t / 0.16) : Math.max(0, 1 - (t - 0.16) / 0.32);
+      const sample = Math.sin(2 * Math.PI * freq * t) * env * 0.55;
+      view.setInt16(44 + i * 2, sample * 32767, true);
+    }
+
+    return URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' }));
+  } catch (e) {
+    return null;
+  }
+};
+
+// 3. Generador de WAV ultra-silencioso (Keep-Alive para 2do plano)
 const crearUrlAudioSilenciosoKeepAlive = () => {
   try {
     const sampleRate = 8000;
@@ -120,6 +142,9 @@ const crearUrlAudioSilenciosoKeepAlive = () => {
 const audioAlarmaUrl = crearUrlAudioAlarma();
 const audioAlarmaGlobal = audioAlarmaUrl ? new Audio(audioAlarmaUrl) : null;
 
+const audioChatUrl = crearUrlAudioChat();
+const audioChatGlobal = audioChatUrl ? new Audio(audioChatUrl) : null;
+
 const audioKeepAliveUrl = crearUrlAudioSilenciosoKeepAlive();
 const audioKeepAliveGlobal = audioKeepAliveUrl ? new Audio(audioKeepAliveUrl) : null;
 if (audioKeepAliveGlobal) {
@@ -133,6 +158,7 @@ const activarKeepAliveSegundoPlano = () => {
   }
 };
 
+// Sonido Fuerte para Signos Vitales / Alertas Clínicas
 const reproducirSonidoAlerta = () => {
   if (audioAlarmaGlobal) {
     audioAlarmaGlobal.currentTime = 0;
@@ -167,6 +193,40 @@ const reproducirSonidoAlerta = () => {
   }
 };
 
+// Sonido Suave y Distintivo exclusivo para Mensajes de Chat
+const reproducirSonidoChat = () => {
+  if (audioChatGlobal) {
+    audioChatGlobal.currentTime = 0;
+    audioChatGlobal.play().catch(() => {});
+  }
+
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    if (ctx.state === 'suspended') ctx.resume();
+
+    const tocarNota = (freq, inicio, duracion) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, inicio);
+      gain.gain.setValueAtTime(0.25, inicio);
+      gain.gain.exponentialRampToValueAtTime(0.001, inicio + duracion);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(inicio);
+      osc.stop(inicio + duracion);
+    };
+
+    const ahora = ctx.currentTime;
+    tocarNota(587.33, ahora, 0.14);      // Re5
+    tocarNota(880.0, ahora + 0.15, 0.28); // La5
+  } catch (error) {
+    console.warn("Audio de chat bloqueado:", error);
+  }
+};
+
 const calcularEdad = (fechaString) => {
   if (!fechaString) return null;
   let fechaNacimiento = new Date(fechaString);
@@ -189,7 +249,11 @@ const TopBar = () => {
   const [userInfo, setUserInfo] = useState(null);
   const [currentUid, setCurrentUid] = useState(null);
   const [noLeidas, setNoLeidas] = useState(0);
+
+  // Dos cuadros de diálogo separados: uno para Alerta Clínica (Signos Vitales/Vigencia) y otro exclusivo para Chat
   const [toastAlerta, setToastAlerta] = useState(null);
+  const [toastChat, setToastChat] = useState(null);
+
   const [permisoNotif, setPermisoNotif] = useState(
     typeof Notification !== 'undefined' ? Notification.permission : 'default'
   );
@@ -202,7 +266,6 @@ const TopBar = () => {
   const notificacionesConocidas = useRef(new Set());
   const cargaInicialCompletada = useRef(false);
   const swRegRef = useRef(null);
-  const alertaVigenciaMostrada = useRef(false);
   const barridoVigenciaRealizado = useRef(false);
 
   useEffect(() => {
@@ -247,35 +310,48 @@ const TopBar = () => {
     }
   }, [navigate]);
 
-const obtenerRutaDeNotificacion = (item) => {
-  if (item.tipoNotif === 'VIGENCIA' || item.tipoNotif === 'CITA') {
-    return item.rutaDestino || '/notificaciones';
-  }
-  return `/sv/${item.uidPx}`;
-};
+  const obtenerRutaDeNotificacion = (item) => {
+    if (item.tipoNotif === 'CHAT') {
+      return item.rutaDestino || '/chat';
+    }
+    if (item.tipoNotif === 'VIGENCIA' || item.tipoNotif === 'CITA') {
+      return item.rutaDestino || '/notificaciones';
+    }
+    return `/sv/${item.uidPx}`;
+  };
 
   const lanzarNotificacionSistema = async (item) => {
     if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
     if (userInfo && userInfo.recibirNotificaciones === false) return;
 
     const esVigencia = item.tipoNotif === 'VIGENCIA';
-    const titulo = esVigencia 
-      ? `📅 ${item.nombrePx}` 
-      : `⚠️ Alerta Clínica: ${item.nombrePx}`;
-    const cuerpo = esVigencia
-      ? item.detalleTexto
-      : `Signos alterados: ${item.detalleTexto}\nRegistró: ${item.capturadoPor}`;
+    const esChat = item.tipoNotif === 'CHAT';
+    const esCita = item.tipoNotif === 'CITA';
+
+    let titulo = `⚠️ Alerta Clínica: ${item.nombrePx}`;
+    let cuerpo = `Signos alterados: ${item.detalleTexto}\nRegistró: ${item.capturadoPor}`;
+
+    if (esChat) {
+      titulo = `${item.nombrePx || '💬 Nuevo Mensaje'}`;
+      cuerpo = `${item.detalleTexto}`;
+    } else if (esVigencia || esCita) {
+      titulo = `📅 ${item.nombrePx}`;
+      cuerpo = item.detalleTexto;
+    }
+
     const urlDestino = obtenerRutaDeNotificacion(item);
 
     const opciones = {
       body: cuerpo,
-      icon: 'https://cdn-icons-png.flaticon.com/512/2966/2966327.png',
+      icon: esChat
+        ? 'https://cdn-icons-png.flaticon.com/512/1041/1041916.png'
+        : 'https://cdn-icons-png.flaticon.com/512/2966/2966327.png',
       badge: 'https://cdn-icons-png.flaticon.com/512/2966/2966327.png',
-      tag: `alerta-${item.idNotif}`,
+      tag: `${esChat ? 'chat' : 'alerta'}-${item.idNotif}`,
       renotify: true,
       requireInteraction: true,
       silent: false,
-      vibrate: [500, 200, 500, 200, 800],
+      vibrate: esChat ? [180, 100, 180] : [500, 200, 500, 200, 800],
       data: {
         url: urlDestino,
         idNotif: item.idNotif
@@ -322,7 +398,7 @@ const obtenerRutaDeNotificacion = (item) => {
         return alert("Debes permitir las notificaciones para recibir alertas.");
       }
 
-      reproducirSonidoAlerta();
+      reproducirSonidoChat();
       activarKeepAliveSegundoPlano();
       setMonitoreoActivo(true);
 
@@ -332,10 +408,10 @@ const obtenerRutaDeNotificacion = (item) => {
         swRegRef.current = reg;
         await navigator.serviceWorker.ready;
 
-        await reg.showNotification('✅ Alertas Clínicas Activas', {
+        await reg.showNotification('✅ Alertas Clínicas y de Chat Activas', {
           body: 'Sonido y monitoreo en 2do plano activados.',
           icon: 'https://cdn-icons-png.flaticon.com/512/2966/2966327.png',
-          vibrate: [300, 150, 300],
+          vibrate: [200, 100, 200],
           tag: 'prueba-activacion',
           renotify: true
         });
@@ -349,7 +425,6 @@ const obtenerRutaDeNotificacion = (item) => {
     if (!user || sessionStorage.getItem('validandoRolLogin') === 'true') {
       setUserInfo(null);
       setCurrentUid(null);
-      verificarCitasDeUsuario(user.uid, rolActivo);
       return;
     }
 
@@ -373,7 +448,8 @@ const obtenerRutaDeNotificacion = (item) => {
         setCurrentUid(user.uid);
         const userRef = ref(db, `usuarios/${rama}/${user.uid}`);
 
-        // Ejecutar barrido global de vigencias (7, 3, 1 y -2 días) una vez por sesión
+        verificarCitasDeUsuario(user.uid, rolActivo);
+
         if (!barridoVigenciaRealizado.current && rolActivo !== 'px') {
           barridoVigenciaRealizado.current = true;
           verificarVigenciasGlobalmente();
@@ -392,14 +468,8 @@ const obtenerRutaDeNotificacion = (item) => {
               rolEval.includes('enfermer');
 
             if (esMedicoOEnfermeria) {
-              // 1. Evaluar si faltan 7, 3, 1 días o tiene 2 días vencido para generar notificación
               await evaluarYNotificarVigenciaUsuario(user.uid, datos, rama);
-
-              // 2. Actualizar estado de Vigencia Vencida (sin expulsar al usuario, activando modo restringido)
-              const fechaLimite = parsearFechaVigencia(datos.vigencia);
-              const ahora = new Date();
-              const vencida = !fechaLimite || ahora > fechaLimite;
-
+              const vencida = estaVigenciaVencida(datos.vigencia);
               localStorage.setItem('vigenciaVencida', vencida ? 'true' : 'false');
               window.dispatchEvent(new Event('vigenciaActualizada'));
             } else {
@@ -499,14 +569,23 @@ const obtenerRutaDeNotificacion = (item) => {
               const aceptaNotificaciones = userInfo && userInfo.recibirNotificaciones !== false;
 
               if (aceptaNotificaciones) {
-                reproducirSonidoAlerta();
-
-                if (navigator.vibrate) {
-                  navigator.vibrate([500, 200, 500, 200, 800]);
+                if (item.tipoNotif === 'CHAT') {
+                  // Sonido exclusivo y diálogo propio para el Chat
+                  reproducirSonidoChat();
+                  if (navigator.vibrate) {
+                    navigator.vibrate([180, 100, 180]);
+                  }
+                  setToastChat(item);
+                  lanzarNotificacionSistema(item);
+                } else {
+                  // Sonido de alarma y diálogo rojo para Signos Vitales / Vigencia
+                  reproducirSonidoAlerta();
+                  if (navigator.vibrate) {
+                    navigator.vibrate([500, 200, 500, 200, 800]);
+                  }
+                  setToastAlerta(item);
+                  lanzarNotificacionSistema(item);
                 }
-
-                setToastAlerta(item);
-                lanzarNotificacionSistema(item);
               }
             }
           }
@@ -522,11 +601,24 @@ const obtenerRutaDeNotificacion = (item) => {
     return () => unsubscribeNotif();
   }, [currentUid, userInfo, navigate]);
 
-  const abrirDestinoDesdeToast = async () => {
+  const abrirDestinoDesdeToastAlerta = async () => {
     if (!toastAlerta) return;
     const destino = obtenerRutaDeNotificacion(toastAlerta);
     const idNotif = toastAlerta.idNotif;
     setToastAlerta(null);
+    try {
+      await update(ref(db, `notificaciones/${currentUid}/${idNotif}`), { leido: true });
+    } catch (e) {
+      console.error(e);
+    }
+    navigate(destino);
+  };
+
+  const abrirDestinoDesdeToastChat = async () => {
+    if (!toastChat) return;
+    const destino = toastChat.rutaDestino || '/chat';
+    const idNotif = toastChat.idNotif;
+    setToastChat(null);
     try {
       await update(ref(db, `notificaciones/${currentUid}/${idNotif}`), { leido: true });
     } catch (e) {
@@ -546,20 +638,20 @@ const obtenerRutaDeNotificacion = (item) => {
   return (
     <>
       <div style={topBarStyle}>
-        {!esPx && aceptaNotifPerfil && (!monitoreoActivo || permisoNotif !== 'granted') && (
+        {aceptaNotifPerfil && (!monitoreoActivo || permisoNotif !== 'granted') && (
           <button onClick={solicitarPermisoNotificaciones} style={btnActivarAlertasStyle}>
             🔔 Activar sonido y alertas en 2do plano
           </button>
         )}
 
-        {!esPx && aceptaNotifPerfil && (
+        {aceptaNotifPerfil && (
           <Link to="/notificaciones" style={bellContainerStyle} title="Ver notificaciones y alertas">
             <FaBell style={{ fontSize: '18px', color: noLeidas > 0 ? '#ffeb3b' : '#ffffff' }} />
             {noLeidas > 0 && <span style={badgeStyle}>{noLeidas}</span>}
           </Link>
         )}
 
-        {!esPx && !aceptaNotifPerfil && (
+        {!aceptaNotifPerfil && (
           <span style={{ fontSize: '12px', backgroundColor: '#e74c3c', padding: '3px 8px', borderRadius: '10px', color: '#fff' }}>
             🔕 Notificaciones desactivadas en tu perfil
           </span>
@@ -630,6 +722,7 @@ const obtenerRutaDeNotificacion = (item) => {
         </div>
       )}
 
+      {/* 1. DIALOG / TOAST ROJO EXCLUSIVO PARA SIGNOS VITALES Y VIGENCIA */}
       {toastAlerta && aceptaNotifPerfil && (
         <div style={{
           ...toastStyle,
@@ -647,7 +740,7 @@ const obtenerRutaDeNotificacion = (item) => {
               <FaTimes />
             </button>
           </div>
-          <div onClick={abrirDestinoDesdeToast} style={{ cursor: 'pointer', marginTop: '8px' }}>
+          <div onClick={abrirDestinoDesdeToastAlerta} style={{ cursor: 'pointer', marginTop: '8px' }}>
             <p style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 'bold' }}>
               {toastAlerta.tipoNotif === 'VIGENCIA' ? toastAlerta.nombrePx : `Paciente: ${toastAlerta.nombrePx}`}
             </p>
@@ -656,6 +749,39 @@ const obtenerRutaDeNotificacion = (item) => {
             </p>
             <span style={{ fontSize: '12px', textDecoration: 'underline', fontWeight: 'bold' }}>
               {toastAlerta.tipoNotif === 'VIGENCIA' ? 'Toque aquí para revisar vigencia →' : 'Toque aquí para ver los Signos Vitales →'}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* 2. NUEVO DIALOG / TOAST AZUL EXCLUSIVO PARA MENSAJES DEL CHAT */}
+      {toastChat && aceptaNotifPerfil && (
+        <div style={toastChatStyle}>
+          <div style={toastHeaderStyle}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}>
+              <FaComments style={{ fontSize: '16px', color: '#93c5fd' }} /> NUEVO MENSAJE DE CHAT
+            </span>
+            <button onClick={() => setToastChat(null)} style={toastCloseBtnStyle}>
+              <FaTimes />
+            </button>
+          </div>
+          <div onClick={abrirDestinoDesdeToastChat} style={{ cursor: 'pointer', marginTop: '8px' }}>
+            <p style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 'bold', color: '#ffffff' }}>
+              {toastChat.nombrePx || `De: ${toastChat.capturadoPor}`}
+            </p>
+            <p style={{ margin: '0 0 8px 0', fontSize: '13.5px', color: '#e0f2fe', lineHeight: 1.35 }}>
+              {toastChat.detalleTexto}
+            </p>
+            <span style={{
+              display: 'inline-block',
+              fontSize: '12px',
+              backgroundColor: 'rgba(255,255,255,0.18)',
+              padding: '4px 10px',
+              borderRadius: '12px',
+              fontWeight: 'bold',
+              color: '#ffffff'
+            }}>
+              Toque aquí para abrir el chat →
             </span>
           </div>
         </div>
@@ -670,7 +796,7 @@ const topBarStyle = {
   flexWrap: 'wrap', gap: '20px', fontSize: '14px', fontFamily: 'Arial, sans-serif',
   boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
 };
-const itemStyle = { display: 'flex', gap: '5px' };
+const itemStyle = { display: 'flex', gap: '5px', alignItems: 'center' };
 const bellContainerStyle = {
   position: 'relative', display: 'flex', alignItems: 'center',
   textDecoration: 'none', marginRight: '5px', cursor: 'pointer'
@@ -715,6 +841,11 @@ const toastStyle = {
   position: 'fixed', top: '65px', right: '20px', backgroundColor: '#c0392b', color: 'white',
   padding: '16px 20px', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.35)',
   zIndex: 9999, maxWidth: '360px', width: '90%', borderLeft: '6px solid #ffeb3b', fontFamily: 'Segoe UI, sans-serif'
+};
+const toastChatStyle = {
+  position: 'fixed', top: '65px', right: '20px', backgroundColor: '#1e3a8a', color: 'white',
+  padding: '16px 20px', borderRadius: '14px', boxShadow: '0 10px 28px rgba(30, 58, 138, 0.45)',
+  zIndex: 10000, maxWidth: '360px', width: '90%', borderLeft: '6px solid #38bdf8', fontFamily: 'Segoe UI, sans-serif'
 };
 const toastHeaderStyle = {
   display: 'flex', justifyContent: 'space-between', alignItems: 'center',

@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import "../Estilos/Principal.css";
 import { BsPersonBadge, BsInfoLg } from "react-icons/bs";
-import { MdOutlineEmojiPeople, MdOutlineGroups, MdNotificationsActive, MdAdminPanelSettings } from "react-icons/md";
 import { ImExit } from "react-icons/im";
 import { TbClock } from "react-icons/tb";
 import { useNavigate, Link } from 'react-router-dom';
 import { auth, db } from '../firebase';
 import { signOut } from 'firebase/auth';
 import { ref, onValue, get } from 'firebase/database';
+import { MdOutlineEmojiPeople, MdOutlineGroups, MdNotificationsActive, MdAdminPanelSettings, MdChatBubbleOutline } from "react-icons/md";
 
 function Principal() {
   const navigate = useNavigate();
@@ -199,6 +199,14 @@ for (const r of ramasABuscar) {
                     <span className='card-title'>Mis Pacientes</span>
                 </Link>
             )}
+
+            {/* CHAT INTERNO: Médico y Enfermería */}
+         {!esAdmin && (
+             <Link to="/chat" className='dashboard-card'>        
+                 <MdChatBubbleOutline className='card-icon' />
+                 <span className='card-title'>Chat Clínico</span>
+             </Link>
+         )}
 
             {/* 2. NOTIFICACIONES (Médico, Enfermería y Admin) */}
             <Link to="/notificaciones" className='dashboard-card' style={{ position: 'relative' }}>        

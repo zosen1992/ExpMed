@@ -4,18 +4,59 @@ import { auth, db } from '../firebase';
 import { ref, onValue, update, remove } from 'firebase/database';
 import { 
   FaArrowLeft, FaBell, FaCheckDouble, FaTrashAlt, 
-  FaExclamationTriangle, FaUserInjured, FaClock, FaCalendarTimes 
+  FaExclamationTriangle, FaUserInjured, FaClock, 
+  FaCalendarTimes, FaCalendarCheck, FaComments, 
+  FaFilePrescription, FaHeartbeat 
 } from 'react-icons/fa';
 import '../Estilos/Notificaciones.css';
-import { verificarCitasDeUsuario } from '../utilidades/verificadorCitas';
+
+// Clasificador automático de notificaciones (detecta tipoNotif y también registros previos por contenido)
+const obtenerCategoriaNotificacion = (item) => {
+  const titulo = String(item.nombrePx || '');
+  const detalle = String(item.detalleTexto || '');
+  const ruta = String(item.rutaDestino || '');
+  const tipo = String(item.tipoNotif || '').toUpperCase();
+
+  if (
+    tipo === 'RECETA' ||
+    titulo.includes('📋') ||
+    detalle.includes('📋') ||
+    titulo.toLowerCase().includes('receta') ||
+    detalle.toLowerCase().includes('indicaciones médicas')
+  ) {
+    return 'RECETA';
+  }
+
+  if (
+    tipo === 'CHAT' ||
+    ruta.startsWith('/chat') ||
+    titulo.includes('💬') ||
+    titulo.toLowerCase().includes('mensaje de') ||
+    titulo.toLowerCase().includes('solicitud de')
+  ) {
+    return 'CHAT';
+  }
+
+  if (tipo === 'CITA' || ruta.startsWith('/mis-citas') || ruta.startsWith('/Agenda')) {
+    return 'CITA';
+  }
+
+  if (tipo === 'VIGENCIA') {
+    return 'VIGENCIA';
+  }
+
+  return 'SIGNOS_VITALES';
+};
 
 const Notificaciones = () => {
   const navigate = useNavigate();
   const myuid = auth.currentUser?.uid;
+  const rolActivo = (localStorage.getItem('rolActivo') || '').toLowerCase();
+  const esPx = rolActivo === 'px';
 
   const [notificaciones, setNotificaciones] = useState([]);
   const [cargando, setCargando] = useState(true);
-  const [filtro, setFiltro] = useState('TODAS');
+  const [filtro, setFiltro] = useState('TODAS'); // 'TODAS' | 'NO_LEIDAS' | 'CHAT' | 'CLINICAS'
 
   useEffect(() => {
     if (!myuid) return;
@@ -39,9 +80,18 @@ const Notificaciones = () => {
   }, [myuid]);
 
   const handleAbrirNotificacion = async (item) => {
-    const destino = (item.tipoNotif === 'VIGENCIA' || item.tipoNotif === 'CITA')
-      ? (item.rutaDestino || '/') 
-      : `/sv/${item.uidPx}`;
+    const categoria = obtenerCategoriaNotificacion(item);
+    let destino = '/';
+
+    if (categoria === 'CHAT' || categoria === 'RECETA') {
+      destino = item.rutaDestino || '/chat';
+    } else if (categoria === 'CITA') {
+      destino = esPx ? `/mis-citas/${myuid}` : (item.rutaDestino || '/Agenda');
+    } else if (categoria === 'VIGENCIA') {
+      destino = item.rutaDestino || '/';
+    } else {
+      destino = `/sv/${item.uidPx || myuid}`;
+    }
 
     try {
       if (!item.leido) {
@@ -77,25 +127,34 @@ const Notificaciones = () => {
     }
   };
 
-  const listaFiltrada = filtro === 'NO_LEIDAS' 
-    ? notificaciones.filter(n => !n.leido) 
-    : notificaciones;
+  const listaFiltrada = notificaciones.filter((n) => {
+    const cat = obtenerCategoriaNotificacion(n);
+    if (filtro === 'NO_LEIDAS') return !n.leido;
+    if (filtro === 'CHAT') return cat === 'CHAT' || cat === 'RECETA';
+    if (filtro === 'CLINICAS') return cat === 'SIGNOS_VITALES' || cat === 'CITA' || cat === 'VIGENCIA';
+    return true;
+  });
 
   const totalNoLeidas = notificaciones.filter(n => !n.leido).length;
 
-  if (cargando) return <div style={{ textAlign: 'center', marginTop: '50px' }}>Cargando notificaciones...</div>;
+  // Limpiar emojis repetidos del título para que se vea limpio junto al ícono de la plantilla
+  const limpiarTitulo = (texto) => {
+    return String(texto || 'Notificación').replace(/^[💬📋📅⚠️✅✕]+\s*/, '').trim();
+  };
+
+  if (cargando) return <div style={{ textAlign: 'center', marginTop: '50px' }}>Cargando historial de notificaciones...</div>;
 
   return (
     <div className='notif-container'>
       
       <div className='notif-header'>
-        <Link to="/" className='btn-regresar-notif'>
-          <FaArrowLeft /> Volver al Panel Principal
+        <Link to={esPx ? `/px/${myuid}` : '/'} className='btn-regresar-notif'>
+          <FaArrowLeft /> {esPx ? 'Volver a mi menú' : 'Volver al Panel Principal'}
         </Link>
 
         <div className='notif-title-bar'>
           <h2 className='notif-titulo'>
-            <FaBell className='bell-icon' /> Historial de Notificaciones y Alertas
+            <FaBell className='bell-icon' /> {esPx ? 'Mis Notificaciones y Recordatorios' : 'Historial de Notificaciones y Alertas'}
             {totalNoLeidas > 0 && <span className='notif-count-badge'>{totalNoLeidas} nuevas</span>}
           </h2>
 
@@ -120,6 +179,18 @@ const Notificaciones = () => {
             >
               No leídas ({totalNoLeidas})
             </button>
+            <button 
+              className={filtro === 'CHAT' ? 'notif-tab-active' : ''} 
+              onClick={() => setFiltro('CHAT')}
+            >
+              <FaComments style={{ marginRight: '5px' }} /> Mensajes y Recetas
+            </button>
+            <button 
+              className={filtro === 'CLINICAS' ? 'notif-tab-active' : ''} 
+              onClick={() => setFiltro('CLINICAS')}
+            >
+              <FaHeartbeat style={{ marginRight: '5px' }} /> Alertas y Citas
+            </button>
           </div>
         )}
       </div>
@@ -127,51 +198,243 @@ const Notificaciones = () => {
       {listaFiltrada.length === 0 ? (
         <div className='notif-empty'>
           <FaBell className='notif-empty-icon' />
-          <h3>No hay notificaciones {filtro === 'NO_LEIDAS' ? 'pendientes de leer' : 'registradas'}</h3>
-          <p>Aquí aparecerán las alertas de signos vitales alterados y los avisos de vencimiento de vigencia (7, 3, 1 y -2 días).</p>
+          <h3>No hay notificaciones en esta sección</h3>
+          <p>
+            {esPx 
+              ? 'Aquí aparecerán tus mensajes de chat médico, recetas compartidas, recordatorios de citas y avisos de tu expediente.'
+              : 'Aquí aparecerán los mensajes de chat con pacientes o colegas, alertas de signos vitales, recordatorios de citas y avisos de vigencia.'}
+          </p>
         </div>
       ) : (
         <div className='notif-list'>
           {listaFiltrada.map((item) => {
-            const esVigencia = item.tipoNotif === 'VIGENCIA';
+            const categoria = obtenerCategoriaNotificacion(item);
+            const tituloLimpio = limpiarTitulo(item.nombrePx);
+            const cuerpoTexto = String(item.detalleTexto || (item.alertas && item.alertas.join(', ')) || '').replace(/^[📋💬]+\s*/, '');
 
+            // ===================================================================
+            // PLANTILLA 1: NOTIFICACIÓN DE CHAT / MENSAJERÍA INTERNA
+            // ===================================================================
+            if (categoria === 'CHAT') {
+              return (
+                <div 
+                  key={item.idNotif} 
+                  onClick={() => handleAbrirNotificacion(item)}
+                  className={`notif-card notif-template-chat ${!item.leido ? 'notif-chat-unread' : 'notif-read'}`}
+                  title="Haz clic para abrir la conversación en el Chat"
+                >
+                  <div className='notif-icon-left icon-box-chat'>
+                    <FaComments />
+                  </div>
+
+                  <div className='notif-body'>
+                    <div className='notif-top-row'>
+                      <h4 className='notif-px-name'>
+                        <span className='tag-categoria-chat'>CHAT CLÍNICO</span>
+                        {tituloLimpio}
+                        {!item.leido && <span className='dot-nuevo dot-azul'>NUEVO MENSAJE</span>}
+                      </h4>
+                      <span className='notif-date'><FaClock /> {item.fecha}</span>
+                    </div>
+
+                    <div className='notif-chat-bubble-preview'>
+                      <strong>Mensaje recibido:</strong> {cuerpoTexto}
+                    </div>
+
+                    <div className='notif-footer-row'>
+                      <span>Remitente: <strong>{item.capturadoPor || 'Usuario'}</strong></span>
+                      <span className='notif-cta cta-chat'>
+                        Clic para abrir conversación en el Chat →
+                      </span>
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={(e) => eliminarNotificacion(e, item.idNotif)} 
+                    className='btn-delete-notif'
+                    title="Eliminar del historial"
+                  >
+                    <FaTrashAlt />
+                  </button>
+                </div>
+              );
+            }
+
+            // ===================================================================
+            // PLANTILLA 2: NOTIFICACIÓN DE RECETA / INDICACIONES MÉDICAS EN CHAT
+            // ===================================================================
+            if (categoria === 'RECETA') {
+              return (
+                <div 
+                  key={item.idNotif} 
+                  onClick={() => handleAbrirNotificacion(item)}
+                  className={`notif-card notif-template-receta ${!item.leido ? 'notif-receta-unread' : 'notif-read'}`}
+                  title="Haz clic para ver tu receta o indicaciones en el Chat"
+                >
+                  <div className='notif-icon-left icon-box-receta'>
+                    <FaFilePrescription />
+                  </div>
+
+                  <div className='notif-body'>
+                    <div className='notif-top-row'>
+                      <h4 className='notif-px-name'>
+                        <span className='tag-categoria-receta'>RECETA / TRATAMIENTO</span>
+                        {tituloLimpio}
+                        {!item.leido && <span className='dot-nuevo dot-verde'>NUEVA</span>}
+                      </h4>
+                      <span className='notif-date'><FaClock /> {item.fecha}</span>
+                    </div>
+
+                    <div className='notif-receta-box-preview'>
+                      <strong>Indicaciones médicas compartidas:</strong>
+                      <p>{cuerpoTexto}</p>
+                    </div>
+
+                    <div className='notif-footer-row'>
+                      <span>Médico tratante: <strong>{item.capturadoPor || 'Médico'}</strong></span>
+                      <span className='notif-cta cta-receta'>
+                        Clic para ver e imprimir receta en el Chat →
+                      </span>
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={(e) => eliminarNotificacion(e, item.idNotif)} 
+                    className='btn-delete-notif'
+                    title="Eliminar del historial"
+                  >
+                    <FaTrashAlt />
+                  </button>
+                </div>
+              );
+            }
+
+            // ===================================================================
+            // PLANTILLA 3: RECORDATORIO DE CITA MÉDICA
+            // ===================================================================
+            if (categoria === 'CITA') {
+              return (
+                <div 
+                  key={item.idNotif} 
+                  onClick={() => handleAbrirNotificacion(item)}
+                  className={`notif-card notif-template-cita ${!item.leido ? 'notif-cita-unread' : 'notif-read'}`}
+                  title="Haz clic para ver los detalles de la cita"
+                >
+                  <div className='notif-icon-left icon-box-cita'>
+                    <FaCalendarCheck />
+                  </div>
+
+                  <div className='notif-body'>
+                    <div className='notif-top-row'>
+                      <h4 className='notif-px-name'>
+                        <span className='tag-categoria-cita'>AGENDA DE CITAS</span>
+                        {tituloLimpio}
+                        {!item.leido && <span className='dot-nuevo dot-morado'>RECORDATORIO</span>}
+                      </h4>
+                      <span className='notif-date'><FaClock /> {item.fecha}</span>
+                    </div>
+
+                    <p className='notif-msg-clean'>
+                      <strong>Detalle de la cita:</strong> {cuerpoTexto}
+                    </p>
+
+                    <div className='notif-footer-row'>
+                      <span>Programado por: <strong>{item.capturadoPor || 'Agenda Médica'}</strong></span>
+                      <span className='notif-cta cta-cita'>
+                        {esPx ? 'Clic para ver Mis Citas →' : 'Clic para abrir Agenda Médica →'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={(e) => eliminarNotificacion(e, item.idNotif)} 
+                    className='btn-delete-notif'
+                    title="Eliminar del historial"
+                  >
+                    <FaTrashAlt />
+                  </button>
+                </div>
+              );
+            }
+
+            // ===================================================================
+            // PLANTILLA 4: AVISO DE VIGENCIA DE CUENTA
+            // ===================================================================
+            if (categoria === 'VIGENCIA') {
+              return (
+                <div 
+                  key={item.idNotif} 
+                  onClick={() => handleAbrirNotificacion(item)}
+                  className={`notif-card notif-template-vigencia ${!item.leido ? 'notif-vigencia-unread' : 'notif-read'}`}
+                >
+                  <div className='notif-icon-left icon-box-vigencia'>
+                    <FaCalendarTimes />
+                  </div>
+
+                  <div className='notif-body'>
+                    <div className='notif-top-row'>
+                      <h4 className='notif-px-name'>
+                        <span className='tag-categoria-vigencia'>VIGENCIA</span>
+                        {tituloLimpio}
+                        {!item.leido && <span className='dot-nuevo dot-ambar'>IMPORTANTE</span>}
+                      </h4>
+                      <span className='notif-date'><FaClock /> {item.fecha}</span>
+                    </div>
+
+                    <p className='notif-msg-clean' style={{ color: '#92400e' }}>
+                      <strong>Aviso de cuenta:</strong> {cuerpoTexto}
+                    </p>
+
+                    <div className='notif-footer-row'>
+                      <span>Origen: <strong>{item.capturadoPor || 'Control de Vigencias'}</strong></span>
+                      <span className='notif-cta' style={{ color: '#d97706' }}>
+                        Clic para revisar vigencia →
+                      </span>
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={(e) => eliminarNotificacion(e, item.idNotif)} 
+                    className='btn-delete-notif'
+                  >
+                    <FaTrashAlt />
+                  </button>
+                </div>
+              );
+            }
+
+            // ===================================================================
+            // PLANTILLA 5: ALERTA CLÍNICA DE SIGNOS VITALES ALTERADOS
+            // ===================================================================
             return (
               <div 
                 key={item.idNotif} 
                 onClick={() => handleAbrirNotificacion(item)}
                 className={`notif-card ${!item.leido ? 'notif-unread' : 'notif-read'}`}
-                title={esVigencia ? "Clic para revisar vigencia" : "Clic para ir a los Signos Vitales del paciente"}
+                title="Clic para ir a los Signos Vitales del paciente"
               >
-                <div 
-                  className='notif-icon-left' 
-                  style={esVigencia ? { backgroundColor: '#fef3c7', color: '#d97706' } : {}}
-                >
-                  {esVigencia ? <FaCalendarTimes /> : <FaExclamationTriangle />}
+                <div className='notif-icon-left'>
+                  <FaExclamationTriangle />
                 </div>
 
                 <div className='notif-body'>
                   <div className='notif-top-row'>
                     <h4 className='notif-px-name'>
-                      {esVigencia ? (
-                        <FaCalendarTimes style={{ marginRight: '6px', color: '#e67e22' }} />
-                      ) : (
-                        <FaUserInjured style={{ marginRight: '6px', color: '#3498db' }} />
-                      )}
-                      {item.nombrePx || 'Notificación'}
-                      {!item.leido && <span className='dot-nuevo'>NUEVA</span>}
+                      <FaUserInjured style={{ marginRight: '6px', color: '#e74c3c' }} />
+                      Paciente: {tituloLimpio}
+                      {!item.leido && <span className='dot-nuevo'>ALERTA</span>}
                     </h4>
                     <span className='notif-date'><FaClock /> {item.fecha}</span>
                   </div>
 
                   <p className='notif-alert-msg'>
-                    <strong>{esVigencia ? 'Aviso de vigencia:' : 'Parámetros alterados:'}</strong>{' '}
-                    {item.detalleTexto || (item.alertas && item.alertas.join(', '))}
+                    <strong>Parámetros alterados:</strong> {cuerpoTexto}
                   </p>
 
                   <div className='notif-footer-row'>
-                    <span>Origen: <strong>{item.capturadoPor || 'Sistema'}</strong></span>
+                    <span>Registrado por: <strong>{item.capturadoPor || 'Personal Clínico'}</strong></span>
                     <span className='notif-cta'>
-                      {esVigencia ? 'Clic para administrar vigencia →' : 'Clic para ir a Signos Vitales →'}
+                      Clic para ir a Signos Vitales →
                     </span>
                   </div>
                 </div>

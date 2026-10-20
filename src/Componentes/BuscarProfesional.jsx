@@ -1,430 +1,419 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { auth, db } from '../firebase';
-import { ref, get, update } from 'firebase/database';
+import { ref, get, set } from 'firebase/database';
 import { 
-  FaArrowLeft, FaUserMd, FaUserNurse, FaMapMarkerAlt, 
-  FaStethoscope, FaStar, FaPhoneAlt, FaBuilding, 
-  FaIdCard, FaTimes, FaCheckCircle, FaLock, FaSearch 
+  FaArrowLeft, FaSearch, FaMapMarkerAlt, FaUserMd, 
+  FaUserNurse, FaStar, FaPhoneAlt, FaGraduationCap, 
+  FaComments, FaCheckCircle 
 } from 'react-icons/fa';
-import { normalizarTexto } from '../constantes/estados';
-import '../Estilos/BuscarProfesional.css';
+import { ESTADOS_REPUBLICA, normalizarTexto } from '../constantes/estados';
+import { estaVigenciaVencida } from '../utilidades/verificadorVigencia';
+
+const generarChatId = (uid1, uid2) => {
+  return [uid1, uid2].sort().join('_');
+};
 
 const BuscarProfesional = () => {
+  const navigate = useNavigate();
   const myuid = auth.currentUser?.uid;
 
-  const [tipoProfesional, setTipoProfesional] = useState('medico');
   const [profesionales, setProfesionales] = useState([]);
-  const [localidadPaciente, setLocalidadPaciente] = useState('');
+  const [misMedicosSet, setMisMedicosSet] = useState(new Set());
+  const [datosPaciente, setDatosPaciente] = useState({});
   const [cargando, setCargando] = useState(true);
 
   // Filtros
-  const [filtroEspecialidad, setFiltroEspecialidad] = useState('');
-  const [busquedaNombre, setBusquedaNombre] = useState('');
-
-  // Estados del Modal de Detalle
-  const [profesionalActivo, setProfesionalActivo] = useState(null);
-  const [esMiProfesional, setEsMiProfesional] = useState(false);
-  const [verificandoRelacion, setVerificandoRelacion] = useState(false);
-  const [miCalificacion, setMiCalificacion] = useState(5);
-  const [guardandoCalif, setGuardandoCalif] = useState(false);
+  const [busqueda, setBusqueda] = useState('');
+  const [filtroEstado, setFiltroEstado] = useState('');
+  const [filtroCategoria, setFiltroCategoria] = useState('TODOS'); // 'TODOS' | 'medico' | 'enfermeria'
 
   useEffect(() => {
-    const cargarDatosYProfesionales = async () => {
-      setCargando(true);
-      setFiltroEspecialidad('');
+    if (!myuid) return;
+
+    const cargarDirectorioProfesionales = async () => {
       try {
-        // 1. Obtener la localidad del paciente logueado
-        let locPx = '';
-        if (myuid) {
-          const snapPx = await get(ref(db, `usuarios/px/${myuid}`));
-          if (snapPx.exists()) {
-            locPx = (snapPx.val().localidad || '').trim();
-            setLocalidadPaciente(locPx);
+        // 1. Obtener datos del paciente logueado
+        const snapPx = await get(ref(db, `usuarios/px/${myuid}`));
+        if (snapPx.exists()) {
+          const pxVal = snapPx.val();
+          setDatosPaciente(pxVal);
+          if (pxVal.localidad) {
+            setFiltroEstado(pxVal.localidad);
           }
         }
 
-        // 2. Buscar profesionales según el tipo seleccionado
-        const ramasABuscar = tipoProfesional === 'medico' 
-          ? ['medico'] 
-          : ['enfermeria', 'enfermero', 'enfemero'];
+        // 2. Verificar qué médicos/enfermeros ya tienen a este paciente asignado en px/[uidProf]/[myuid]
+        const snapRelaciones = await get(ref(db, 'px'));
+        const setAsignados = new Set();
+        if (snapRelaciones.exists()) {
+          const relVal = snapRelaciones.val();
+          Object.keys(relVal).forEach((uidProf) => {
+            if (relVal[uidProf] && relVal[uidProf][myuid]) {
+              setAsignados.add(uidProf);
+            }
+          });
+        }
+        setMisMedicosSet(setAsignados);
 
-        const mapaUnico = {};
+        // 3. Cargar profesionales públicos de usuarios/medico y usuarios/enfermeria
+        const snapUsuarios = await get(ref(db, 'usuarios'));
+        if (snapUsuarios.exists()) {
+          const ramas = snapUsuarios.val();
+          const lista = [];
+          const uidsAgregados = new Set();
 
-        for (const rama of ramasABuscar) {
-          const snap = await get(ref(db, `usuarios/${rama}`));
-          if (snap.exists()) {
-            const data = snap.val();
-            Object.keys(data).forEach((uidProf) => {
-              const item = data[uidProf];
-              
-              // Validar estatus "publico"
-              const esEstatusPublico = 
-                String(item.visibilidad || '').trim().toLowerCase() === 'publico' && 
-                item.oculto !== true;
+          const ramasConfig = [
+            { nodo: 'medico', rolNorm: 'medico', etiqueta: 'Médico' },
+            { nodo: 'enfermeria', rolNorm: 'enfermeria', etiqueta: 'Enfermería' },
+            { nodo: 'enfermero', rolNorm: 'enfermeria', etiqueta: 'Enfermería' },
+            { nodo: 'enfemero', rolNorm: 'enfermeria', etiqueta: 'Enfermería' }
+          ];
 
-              // Validar que coincida con la localidad del paciente logueado
-              const locProf = (item.localidad || '').trim();
-              const coincideLocalidadConPx = locPx 
-                ? normalizarTexto(locProf) === normalizarTexto(locPx)
-                : true;
+          ramasConfig.forEach(({ nodo, rolNorm, etiqueta }) => {
+            if (ramas[nodo]) {
+              Object.keys(ramas[nodo]).forEach((uidProf) => {
+                if (uidsAgregados.has(uidProf)) return;
+                const u = ramas[nodo][uidProf];
+                const esOculto = u.oculto === true || u.visibilidad === 'oculto';
+                if (esOculto) return; // Respetar privacidad de perfiles ocultos
 
-              if (esEstatusPublico && coincideLocalidadConPx) {
-                let listaEspecialidades = [];
-                if (tipoProfesional === 'medico') {
-                  if (item.especialidad1) listaEspecialidades.push(item.especialidad1.trim());
-                  if (item.especialidad2) listaEspecialidades.push(item.especialidad2.trim());
-                  if (item.especialidad3) listaEspecialidades.push(item.especialidad3.trim());
-                  if (listaEspecialidades.length === 0) listaEspecialidades.push('Médico General / Cirujano Partero');
-                } else {
-                  const espEnf = item.especialidad_enf || item.especialidad || 'Enfermería General';
-                  listaEspecialidades.push(espEnf.trim());
-                }
-
-                mapaUnico[uidProf] = {
+                uidsAgregados.add(uidProf);
+                lista.push({
                   uid: uidProf,
-                  ramaOrigen: rama,
-                  ...item,
-                  nombreMostrar: item.nombre || item.nombrecom || 'Profesional de la Salud',
-                  localidadMostrar: locProf || 'Sin especificar',
-                  especialidadesArray: listaEspecialidades,
-                  especialidadTexto: listaEspecialidades.join(' • '),
-                  calificacionPromedio: item.calificacion !== undefined ? Number(item.calificacion) : 5
-                };
-              }
-            });
-          }
-        }
+                  nombre: u.nombre || u.nombrecom || 'Profesional de Salud',
+                  rol: rolNorm,
+                  rolEtiqueta: etiqueta,
+                  cedula: u.cedula_partero || u.cedula || '',
+                  universidad: u.universidad || u.universidad_enf || '',
+                  especialidad1: u.especialidad1 || u.especialidad_enf || u.especialidad || '',
+                  cedula_esp1: u.cedula_esp1 || '',
+                  especialidad2: u.especialidad2 || '',
+                  especialidad3: u.especialidad3 || '',
+                  localidad: u.localidad || 'Sin localidad',
+                  direccion: u.direccion || '',
+                  telefono: u.num_cel || u.celular || '',
+                  fotoperfil: u.fotoperfil || '',
+                  enDescanso: estaVigenciaVencida(u.vigencia),
+                  calificacion: u.calificacion !== undefined ? Number(u.calificacion) : 5
+                });
+              });
+            }
+          });
 
-        setProfesionales(Object.values(mapaUnico));
+          setProfesionales(lista);
+        }
       } catch (error) {
-        console.error("Error al cargar directorio:", error);
+        console.error("Error al cargar profesionales:", error);
       } finally {
         setCargando(false);
       }
     };
 
-    cargarDatosYProfesionales();
-  }, [tipoProfesional, myuid]);
+    cargarDirectorioProfesionales();
+  }, [myuid]);
 
-  const especialidadesDisponibles = Array.from(
-    new Set(profesionales.flatMap(p => p.especialidadesArray).filter(Boolean))
-  ).sort();
+  // Acción del botón "Enviar Mensaje"
+  const handleIniciarMensajeConProfesional = async (prof) => {
+    //if (!myuid || !prof?.uid) return;
+    if (!myuid || !prof?.uid) return;
 
-  const profesionalesFiltrados = profesionales.filter((prof) => {
-    const coincideEspecialidad = !filtroEspecialidad || prof.especialidadesArray.some(
-      esp => esp.toLowerCase() === filtroEspecialidad.toLowerCase()
-    );
-    const coincideNombre = !busquedaNombre || prof.nombreMostrar.toLowerCase().includes(busquedaNombre.toLowerCase());
+    if (prof.enDescanso) {
+      return alert(
+        `🌿 Profesional temporalmente fuera de línea:\n\n` +
+        `En este momento ${prof.nombre} ha hecho una pausa en la recepción de mensajes por motivos de agenda y descanso profesional.\n\n` +
+        `Te sugerimos contactar a otro especialista disponible en el directorio.`
+      );
+    }
 
-    return coincideEspecialidad && coincideNombre;
+    const esMiMedico = misMedicosSet.has(prof.uid);
+
+    // Si NO es su médico tratante, mostrar advertencia antes de proceder
+    if (!esMiMedico) {
+      const confirmar = window.confirm(
+        `⚠️ Aviso importante:\n\n` +
+        `El profesional "${prof.nombre}" aún no te tiene registrado en su lista de pacientes.\n\n` +
+        `Puedes enviarle una solicitud de mensaje, sin embargo, ten en cuenta que al no ser tu médico tratante podría no responder.\n\n` +
+        `¿Deseas continuar y enviarle mensaje?`
+      );
+      if (!confirmar) return;
+    }
+
+    try {
+      const chatId = generarChatId(myuid, prof.uid);
+      const snapChat = await get(ref(db, `chats/${chatId}/info`));
+
+      if (!snapChat.exists()) {
+        const ahoraStr = new Date().toLocaleString('es-MX', {
+          day: '2-digit', month: '2-digit', year: 'numeric',
+          hour: '2-digit', minute: '2-digit'
+        });
+
+        await set(ref(db, `chats/${chatId}/info`), {
+          chatId,
+          participantes: {
+            [myuid]: true,
+            [prof.uid]: true
+          },
+          datosParticipantes: {
+            [myuid]: {
+              uid: myuid,
+              nombre: datosPaciente.nombre || datosPaciente.nombrecom || 'Paciente',
+              rol: 'px',
+              especialidad: '',
+              fotoperfil: datosPaciente.fotoperfil || ''
+            },
+            [prof.uid]: {
+              uid: prof.uid,
+              nombre: prof.nombre,
+              rol: prof.rol,
+              especialidad: prof.especialidad1 || prof.rolEtiqueta,
+              fotoperfil: prof.fotoperfil || ''
+            }
+          },
+          estado: 'pendiente',
+          iniciadoPor: myuid,
+          aprobadorUid: prof.uid,
+          esPacienteAsignado: esMiMedico, // Indica al médico si ya es su paciente o si es externo
+          ultimoMensaje: 'Solicitud de conversación pendiente...',
+          ultimaFecha: ahoraStr,
+          timestamp: Date.now(),
+          noLeidos: {
+            [myuid]: 0,
+            [prof.uid]: 0
+          }
+        });
+      }
+
+      navigate(`/chat/${chatId}`);
+    } catch (error) {
+      console.error("Error al abrir chat con profesional:", error);
+      alert("No se pudo abrir la ventana de mensaje.");
+    }
+  };
+
+  const termino = normalizarTexto(busqueda);
+
+  const listaFiltrada = profesionales.filter((p) => {
+    const coincideCat = filtroCategoria === 'TODOS' || p.rol === filtroCategoria;
+    const coincideEstado = !filtroEstado || normalizarTexto(p.localidad) === normalizarTexto(filtroEstado);
+    const coincideTexto = !termino ||
+      normalizarTexto(p.nombre).includes(termino) ||
+      normalizarTexto(p.especialidad1).includes(termino) ||
+      normalizarTexto(p.especialidad2).includes(termino) ||
+      normalizarTexto(p.direccion).includes(termino);
+
+    return coincideCat && coincideEstado && coincideTexto;
   });
-
-  const abrirDetalleProfesional = async (prof) => {
-    setProfesionalActivo(prof);
-    setVerificandoRelacion(true);
-    setEsMiProfesional(false);
-
-    const califPrevia = prof.calificacionesPorPx?.[myuid];
-    setMiCalificacion(califPrevia ? Number(califPrevia) : 5);
-
-    try {
-      if (myuid) {
-        const relSnap = await get(ref(db, `px/${prof.uid}/${myuid}`));
-        setEsMiProfesional(relSnap.exists());
-      }
-    } catch (error) {
-      console.error("Error al verificar relación paciente-profesional:", error);
-    } finally {
-      setVerificandoRelacion(false);
-    }
-  };
-
-  const handleEnviarCalificacion = async () => {
-    if (!profesionalActivo || !myuid || !esMiProfesional) return;
-    setGuardandoCalif(true);
-
-    try {
-      const rama = profesionalActivo.ramaOrigen;
-      const profUid = profesionalActivo.uid;
-
-      const profSnap = await get(ref(db, `usuarios/${rama}/${profUid}`));
-      if (profSnap.exists()) {
-        const dataActual = profSnap.val();
-        const votosActuales = dataActual.calificacionesPorPx || {};
-        
-        votosActuales[myuid] = Number(miCalificacion);
-
-        const valores = Object.values(votosActuales).map(Number);
-        const suma = valores.reduce((acc, curr) => acc + curr, 0);
-        const nuevoPromedio = Number((suma / valores.length).toFixed(1));
-
-        await update(ref(db, `usuarios/${rama}/${profUid}`), {
-          calificacion: nuevoPromedio,
-          calificacionesPorPx: votosActuales
-        });
-
-        setProfesionalActivo({
-          ...profesionalActivo,
-          calificacionPromedio: nuevoPromedio,
-          calificacionesPorPx: votosActuales
-        });
-
-        setProfesionales(prev => prev.map(p => 
-          p.uid === profUid 
-            ? { ...p, calificacionPromedio: nuevoPromedio, calificacionesPorPx: votosActuales } 
-            : p
-        ));
-
-        alert("¡Gracias! Tu calificación ha sido registrada correctamente.");
-      }
-    } catch (error) {
-      console.error("Error al guardar calificación:", error);
-      alert("Hubo un error al registrar tu calificación.");
-    } finally {
-      setGuardandoCalif(false);
-    }
-  };
 
   const avatarDefault = 'https://cdn-icons-png.flaticon.com/512/3774/3774299.png';
 
+  if (cargando) return <div style={{ textAlign: 'center', marginTop: '60px' }}>Cargando directorio de profesionales...</div>;
+
   return (
-    <div className='directorio-container'>
+    <div style={{ maxWidth: '1080px', margin: '28px auto', padding: '0 20px', fontFamily: 'Segoe UI, Roboto, sans-serif' }}>
       
-      {/* HEADER */}
-      <div className='directorio-header'>
-        <Link to={myuid ? `/px/${myuid}` : '/'} className='btn-regresar-dir'>
+      {/* CABECERA */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
+        <Link to={`/px/${myuid}`} style={btnBackStyle}>
           <FaArrowLeft /> Regresar a mi menú
         </Link>
-        <h2 className='directorio-titulo'>Directorio de Profesionales</h2>
-        <p className='directorio-subtitulo'>
-          Mostrando profesionales disponibles en tu localidad:{' '}
-          <strong style={{ color: '#2980b9' }}>{localidadPaciente || 'No definida en tu perfil'}</strong>
-        </p>
-      </div>
 
-      {/* SELECTOR DE TIPO DE PERSONAL: MÉDICO O ENFERMERO */}
-      <div className='selector-rol-bar'>
-        <button 
-          type="button"
-          className={`btn-rol-tab ${tipoProfesional === 'medico' ? 'active-rol' : ''}`}
-          onClick={() => setTipoProfesional('medico')}
-        >
-          <FaUserMd className='tab-icon' /> Médicos
-        </button>
-
-        <button 
-          type="button"
-          className={`btn-rol-tab ${tipoProfesional === 'enfermeria' ? 'active-rol' : ''}`}
-          onClick={() => setTipoProfesional('enfermeria')}
-        >
-          <FaUserNurse className='tab-icon' /> Enfermeros
-        </button>
+        <h2 style={{ margin: 0, color: '#1e293b', fontSize: '1.55rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <FaUserMd style={{ color: '#3498db' }} /> Buscar Profesional de Salud
+        </h2>
       </div>
 
       {/* BARRA DE FILTROS */}
-      <div className='filtros-directorio-box'>
-        
-        <div className='filtro-item'>
-          <label><FaMapMarkerAlt /> Tu Localidad</label>
-          <input 
-            type="text" 
-            value={localidadPaciente || 'Sin localidad asignada'} 
-            readOnly 
-            style={{ backgroundColor: '#e8f4fd', color: '#1b4f72', fontWeight: 'bold' }}
+      <div style={filterBoxStyle}>
+        <div style={searchInputWrapper}>
+          <FaSearch style={{ color: '#3498db' }} />
+          <input
+            type="text"
+            placeholder="Buscar por nombre, especialidad o consultorio..."
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            style={inputCleanStyle}
           />
         </div>
 
-        <div className='filtro-item'>
-          <label><FaStethoscope /> Especialidad</label>
-          <select value={filtroEspecialidad} onChange={(e) => setFiltroEspecialidad(e.target.value)}>
-            <option value="">Todas las especialidades</option>
-            {especialidadesDisponibles.map((esp, idx) => (
-              <option key={idx} value={esp}>{esp}</option>
-            ))}
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <div style={selectWrapperStyle}>
+            <FaMapMarkerAlt style={{ color: '#3498db' }} />
+            <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)} style={selectCleanStyle}>
+              <option value="">Todos los estados</option>
+              {ESTADOS_REPUBLICA.map((est) => (
+                <option key={est} value={est}>{est}</option>
+              ))}
+            </select>
+          </div>
+
+          <select value={filtroCategoria} onChange={(e) => setFiltroCategoria(e.target.value)} style={selectCategoryStyle}>
+            <option value="TODOS">Médicos y Enfermería</option>
+            <option value="medico">Solo Médicos</option>
+            <option value="enfermeria">Solo Enfermería</option>
           </select>
         </div>
-
-        <div className='filtro-item'>
-          <label><FaSearch /> Buscar por nombre</label>
-          <input 
-            type="text" 
-            placeholder="Ej. Dr. Mario..." 
-            value={busquedaNombre}
-            onChange={(e) => setBusquedaNombre(e.target.value)}
-          />
-        </div>
-
       </div>
 
-      {/* LISTADO DE TARJETAS */}
-      {cargando ? (
-        <div className='dir-loading'>Buscando profesionales disponibles en {localidadPaciente}...</div>
-      ) : profesionalesFiltrados.length === 0 ? (
-        <div className='dir-empty'>
-          {tipoProfesional === 'medico' ? <FaUserMd className='dir-empty-icon' /> : <FaUserNurse className='dir-empty-icon' />}
-          <h3>No se encontraron profesionales en {localidadPaciente || 'tu localidad'}</h3>
-          <p>Asegúrate de tener actualizada tu localidad en el apartado de Información General.</p>
+      {/* LISTADO DE PROFESIONALES */}
+      {listaFiltrada.length === 0 ? (
+        <div style={emptyBoxStyle}>
+          <h3 style={{ margin: '0 0 6px 0', color: '#334155' }}>No se encontraron profesionales con estos filtros</h3>
+          <p style={{ margin: 0, color: '#64748b' }}>Intenta seleccionar "Todos los estados" o cambiar tu búsqueda.</p>
         </div>
       ) : (
-        <div className='grid-profesionales'>
-          {profesionalesFiltrados.map((prof) => (
-            <div 
-              key={prof.uid} 
-              className='card-profesional'
-              onClick={() => abrirDetalleProfesional(prof)}
-            >
-              <img 
-                src={prof.fotoperfil || avatarDefault} 
-                alt={prof.nombreMostrar} 
-                className='prof-avatar'
-              />
-              
-              <div className='prof-card-body'>
-                <h3 className='prof-name'>{prof.nombreMostrar}</h3>
-                <p className='prof-specialty'>{prof.especialidadTexto}</p>
-                
-                <div className='prof-meta'>
-                  <span className='prof-loc'>
-                    <FaMapMarkerAlt /> {prof.localidadMostrar}
-                  </span>
-                  <span className='prof-rating'>
-                    <FaStar className='star-gold' /> {prof.calificacionPromedio.toFixed(1)}
-                  </span>
-                </div>
+        <div style={gridStyle}>
+          {listaFiltrada.map((prof) => {
+            const esMiMedico = misMedicosSet.has(prof.uid);
 
-                <span className='prof-ver-mas'>Ver teléfono, dirección y más →</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* MODAL DE DETALLE */}
-      {profesionalActivo && (
-        <div className='modal-dir-overlay' onClick={() => setProfesionalActivo(null)}>
-          <div className='modal-dir-content' onClick={(e) => e.stopPropagation()}>
-            
-            <button className='btn-close-dir' onClick={() => setProfesionalActivo(null)}>
-              <FaTimes />
-            </button>
-
-            <div className='modal-prof-header'>
-              <img 
-                src={profesionalActivo.fotoperfil || avatarDefault} 
-                alt={profesionalActivo.nombreMostrar} 
-                className='modal-prof-avatar'
-              />
-              <div>
-                <h3>{profesionalActivo.nombreMostrar}</h3>
-                <span className='badge-prof-rol'>
-                  {tipoProfesional === 'medico' ? 'Médico' : 'Enfermería'}
-                </span>
-                <div className='modal-stars-display'>
-                  {[1, 2, 3, 4, 5].map((s) => (
-                    <FaStar 
-                      key={s} 
-                      className={s <= Math.round(profesionalActivo.calificacionPromedio) ? 'star-gold' : 'star-gray'} 
+            return (
+              <div key={prof.uid} style={cardStyle}>
+                <div>
+                  <div style={{ display: 'flex', gap: '14px', alignItems: 'center', marginBottom: '12px' }}>
+                    <img
+                      src={prof.fotoperfil && prof.fotoperfil !== 'null' ? prof.fotoperfil : avatarDefault}
+                      alt={prof.nombre}
+                      style={avatarStyle}
+                      onError={(e) => { e.target.onerror = null; e.target.src = avatarDefault; }}
                     />
-                  ))}
-                  <span>({profesionalActivo.calificacionPromedio.toFixed(1)} / 5.0)</span>
-                </div>
-              </div>
-            </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '6px' }}>
+                        <h3 style={{ margin: 0, fontSize: '1.08rem', color: '#1e293b' }}>{prof.nombre}</h3>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', color: '#f59e0b', fontWeight: 700, fontSize: '0.86rem' }}>
+                          <FaStar /> {prof.calificacion.toFixed(1)}
+                        </span>
+                      </div>
 
-            <div className='modal-prof-details'>
-              <div className='detail-row'>
-                <FaStethoscope className='detail-icon' />
-                <div>
-                  <strong>Especialidad(es):</strong>
-                  <p>{profesionalActivo.especialidadTexto}</p>
-                </div>
-              </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '5px' }}>
+                        <span style={prof.rol === 'medico' ? badgeMedStyle : badgeEnfStyle}>
+                          {prof.rol === 'medico' ? <><FaUserMd /> Médico</> : <><FaUserNurse /> Enfermería</>}
+                        </span>
 
-              {(profesionalActivo.cedula_partero || profesionalActivo.cedula) && (
-                <div className='detail-row'>
-                  <FaIdCard className='detail-icon' />
-                  <div>
-                    <strong>Cédula Profesional:</strong>
-                    <p>{profesionalActivo.cedula_partero || profesionalActivo.cedula}</p>
-                    {profesionalActivo.cedula_esp1 && <small>Céd. Esp 1: {profesionalActivo.cedula_esp1} </small>}
-                    {profesionalActivo.cedula_esp2 && <small>| Céd. Esp 2: {profesionalActivo.cedula_esp2}</small>}
-                  </div>
-                </div>
-              )}
-
-              <div className='detail-row'>
-                <FaPhoneAlt className='detail-icon' />
-                <div>
-                  <strong>Teléfono de Contacto:</strong>
-                  <p>{profesionalActivo.num_cel || profesionalActivo.celular || 'No especificado'}</p>
-                </div>
-              </div>
-
-              <div className='detail-row'>
-                <FaBuilding className='detail-icon' />
-                <div>
-                  <strong>Dirección / Consultorio:</strong>
-                  <p>{profesionalActivo.direccion || 'No especificada'}</p>
-                </div>
-              </div>
-
-              <div className='detail-row'>
-                <FaMapMarkerAlt className='detail-icon' />
-                <div>
-                  <strong>Localidad:</strong>
-                  <p>{profesionalActivo.localidadMostrar}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className='modal-rating-section'>
-              {verificandoRelacion ? (
-                <p style={{ textAlign: 'center', color: '#7f8c8d' }}>Verificando vínculo con el profesional...</p>
-              ) : esMiProfesional ? (
-                <div className='rating-box-allowed'>
-                  <div className='rating-allowed-header'>
-                    <FaCheckCircle style={{ color: '#2ecc71' }} />
-                    <strong>Eres paciente registrado de este profesional</strong>
-                  </div>
-                  <p>Selecciona de 1 a 5 estrellas para calificar su atención:</p>
-                  
-                  <div className='interactive-stars'>
-                    {[1, 2, 3, 4, 5].map((num) => (
-                      <FaStar
-                        key={num}
-                        onClick={() => setMiCalificacion(num)}
-                        className={`star-btn ${num <= miCalificacion ? 'star-gold' : 'star-gray'}`}
-                      />
-                    ))}
+                        {esMiMedico && (
+                          <span style={badgeMiMedicoStyle}>
+                            <FaCheckCircle /> Es tu médico
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
-                  <button 
-                    type="button" 
-                    onClick={handleEnviarCalificacion} 
-                    disabled={guardandoCalif}
-                    className='btn-enviar-calif'
-                  >
-                    {guardandoCalif ? 'Guardando...' : `Enviar calificación (${miCalificacion} ★)`}
-                  </button>
-                </div>
-              ) : (
-                <div className='rating-box-locked'>
-                  <FaLock className='lock-icon' />
-                  <div>
-                    <strong>Calificación deshabilitada</strong>
-                    <p>Solo los pacientes dados de alta en el expediente de este profesional pueden calificarlo.</p>
+                  <div style={infoBodyStyle}>
+                    {prof.especialidad1 && (
+                      <p style={infoRowStyle}>
+                        <FaGraduationCap style={{ color: '#3498db', flexShrink: 0 }} />
+                        <span><strong>Especialidad:</strong> {prof.especialidad1}</span>
+                      </p>
+                    )}
+                    {prof.cedula && (
+                      <p style={infoRowStyle}>
+                        <span><strong>Céd. Prof.:</strong> {prof.cedula} {prof.universidad ? `(${prof.universidad})` : ''}</span>
+                      </p>
+                    )}
+                    <p style={infoRowStyle}>
+                      <FaMapMarkerAlt style={{ color: '#e74c3c', flexShrink: 0 }} />
+                      <span><strong>Localidad:</strong> {prof.localidad} {prof.direccion ? `• ${prof.direccion}` : ''}</span>
+                    </p>
+                    {prof.telefono && (
+                      <p style={infoRowStyle}>
+                        <FaPhoneAlt style={{ color: '#2ecc71', flexShrink: 0 }} />
+                        <span><strong>Contacto:</strong> {prof.telefono}</span>
+                      </p>
+                    )}
                   </div>
                 </div>
-              )}
-            </div>
 
-          </div>
+                <button
+                  type="button"
+                  onClick={() => handleIniciarMensajeConProfesional(prof)}
+                  style={esMiMedico ? btnMsgDirectoStyle : btnMsgExternoStyle}
+                >
+                  <FaComments /> Enviar Mensaje {!esMiMedico && '(Solicitar contacto)'}
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
 
     </div>
   );
+};
+
+const btnBackStyle = {
+  display: 'inline-flex', alignItems: 'center', gap: '8px',
+  backgroundColor: '#e8f4fd', color: '#3498db', padding: '8px 15px',
+  borderRadius: '8px', textDecoration: 'none', fontWeight: 600
+};
+const filterBoxStyle = {
+  backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '14px',
+  padding: '14px 16px', marginBottom: '22px', display: 'flex', flexWrap: 'wrap',
+  gap: '12px', justifyContent: 'space-between', alignItems: 'center',
+  boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+};
+const searchInputWrapper = {
+  flex: 1, minWidth: '240px', display: 'flex', alignItems: 'center', gap: '10px',
+  backgroundColor: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '9px 14px'
+};
+const inputCleanStyle = {
+  border: 'none', outline: 'none', width: '100%', backgroundColor: 'transparent', fontSize: '0.94rem'
+};
+const selectWrapperStyle = {
+  display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#f8fafc',
+  border: '1px solid #cbd5e1', borderRadius: '10px', padding: '8px 12px'
+};
+const selectCleanStyle = {
+  border: 'none', outline: 'none', backgroundColor: 'transparent', fontSize: '0.9rem', color: '#1e293b'
+};
+const selectCategoryStyle = {
+  backgroundColor: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '10px',
+  padding: '8px 12px', fontSize: '0.9rem', color: '#1e293b', outline: 'none'
+};
+const gridStyle = {
+  display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(310px, 1fr))', gap: '18px'
+};
+const cardStyle = {
+  backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '16px',
+  padding: '18px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+  gap: '14px', boxShadow: '0 4px 12px rgba(0,0,0,0.04)'
+};
+const avatarStyle = {
+  width: '60px', height: '60px', borderRadius: '50%', objectFit: 'cover',
+  border: '2px solid #e8f4fd', flexShrink: 0
+};
+const badgeMedStyle = {
+  backgroundColor: '#e8f4fd', color: '#2980b9', fontSize: '0.75rem', fontWeight: 700,
+  padding: '3px 8px', borderRadius: '10px', display: 'inline-flex', alignItems: 'center', gap: '4px'
+};
+const badgeEnfStyle = {
+  backgroundColor: '#e8f8f5', color: '#16a085', fontSize: '0.75rem', fontWeight: 700,
+  padding: '3px 8px', borderRadius: '10px', display: 'inline-flex', alignItems: 'center', gap: '4px'
+};
+const badgeMiMedicoStyle = {
+  backgroundColor: '#dcfce7', color: '#166534', fontSize: '0.74rem', fontWeight: 700,
+  padding: '3px 8px', borderRadius: '10px', display: 'inline-flex', alignItems: 'center', gap: '4px'
+};
+const infoBodyStyle = {
+  backgroundColor: '#f8fafc', borderRadius: '10px', padding: '10px 12px',
+  display: 'flex', flexDirection: 'column', gap: '6px'
+};
+const infoRowStyle = {
+  margin: 0, fontSize: '0.84rem', color: '#334155', display: 'flex', alignItems: 'center', gap: '6px'
+};
+const btnMsgDirectoStyle = {
+  width: '100%', backgroundColor: '#2ecc71', color: '#ffffff', border: 'none',
+  padding: '10px 14px', borderRadius: '10px', fontWeight: 700, fontSize: '0.9rem',
+  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+};
+const btnMsgExternoStyle = {
+  width: '100%', backgroundColor: '#3498db', color: '#ffffff', border: 'none',
+  padding: '10px 14px', borderRadius: '10px', fontWeight: 700, fontSize: '0.9rem',
+  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+};
+const emptyBoxStyle = {
+  backgroundColor: '#f8fafc', border: '2px dashed #cbd5e1', borderRadius: '14px',
+  padding: '40px 20px', textAlign: 'center'
 };
 
 export default BuscarProfesional;

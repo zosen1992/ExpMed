@@ -1,5 +1,5 @@
 .notif-container {
-  max-width: 900px;
+  max-width: 920px;
   margin: 30px auto;
   padding: 0 20px;
   font-family: 'Segoe UI', Roboto, sans-serif;
@@ -20,6 +20,9 @@
   text-decoration: none;
   font-weight: 600;
   align-self: flex-start;
+  padding: 7px 14px;
+  background-color: #e8f4fd;
+  border-radius: 8px;
 }
 
 .notif-title-bar {
@@ -27,16 +30,17 @@
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 15px;
 }
 
 .notif-titulo {
   margin: 0;
-  color: #2c3e50;
+  color: #1e293b;
   font-size: 1.7rem;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .bell-icon {
@@ -45,100 +49,116 @@
 
 .notif-count-badge {
   background-color: #e74c3c;
-  color: white;
+  color: #ffffff;
   font-size: 0.85rem;
-  padding: 4px 10px;
+  padding: 4px 12px;
   border-radius: 20px;
+  font-weight: 700;
 }
 
 .btn-marcar-leidas {
   background-color: #e8f4fd;
   color: #2980b9;
   border: 1px solid #bcdff1;
-  padding: 8px 14px;
+  padding: 9px 16px;
   border-radius: 8px;
   font-weight: 600;
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 6px;
-}
-
-.btn-marcar-leidas:hover {
-  background-color: #d4e9f7;
+  gap: 8px;
 }
 
 .notif-tabs {
   display: flex;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .notif-tabs button {
-  padding: 7px 16px;
+  padding: 8px 16px;
   border-radius: 20px;
-  border: 1px solid #dce1e5;
-  background: #f8f9fa;
-  color: #555;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #475569;
   font-weight: 600;
+  font-size: 0.86rem;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
 }
 
 .notif-tabs button.notif-tab-active {
-  background: #3498db;
-  color: #fff;
+  background-color: #3498db;
+  color: #ffffff;
   border-color: #3498db;
 }
 
-/* Lista */
+.notif-empty {
+  text-align: center;
+  background: #f8fafc;
+  border: 2px dashed #cbd5e1;
+  border-radius: 16px;
+  padding: 50px 20px;
+  color: #64748b;
+}
+
+.notif-empty-icon {
+  font-size: 3rem;
+  color: #cbd5e1;
+  margin-bottom: 12px;
+}
+
 .notif-list {
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 
+/* Base Card (Signos Vitales por defecto) */
 .notif-card {
   background: #ffffff;
-  border: 1px solid #e1e8ed;
-  border-left: 5px solid #bdc3c7;
-  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  border-left: 5px solid #e74c3c;
+  border-radius: 14px;
   padding: 16px 20px;
   display: flex;
   align-items: center;
   gap: 16px;
   cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .notif-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
 }
 
 .notif-unread {
-  border-left-color: #e74c3c;
-  background-color: #fffaf9;
+  background-color: #fff8f8;
+}
+
+.notif-read {
+  opacity: 0.9;
 }
 
 .notif-icon-left {
-  width: 45px;
-  height: 45px;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
-  background-color: #fceceb;
+  background-color: #fde8e8;
   color: #e74c3c;
   display: flex;
-  justify-content: center;
   align-items: center;
-  font-size: 1.3rem;
+  justify-content: center;
+  font-size: 1.25rem;
   flex-shrink: 0;
-}
-
-.notif-read .notif-icon-left {
-  background-color: #ecf0f1;
-  color: #7f8c8d;
 }
 
 .notif-body {
   flex: 1;
+  min-width: 0;
 }
 
 .notif-top-row {
@@ -152,24 +172,31 @@
 
 .notif-px-name {
   margin: 0;
-  font-size: 1.15rem;
-  color: #2c3e50;
+  font-size: 1.05rem;
+  color: #1e293b;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .dot-nuevo {
   background-color: #e74c3c;
-  color: white;
-  font-size: 0.7rem;
+  color: #ffffff;
+  font-size: 0.68rem;
+  font-weight: 800;
   padding: 2px 8px;
   border-radius: 10px;
-  margin-left: 10px;
 }
 
+.dot-azul { background-color: #2563eb; }
+.dot-verde { background-color: #0d9488; }
+.dot-morado { background-color: #7c3aed; }
+.dot-ambar { background-color: #d97706; }
+
 .notif-date {
-  font-size: 0.82rem;
-  color: #7f8c8d;
+  font-size: 0.8rem;
+  color: #64748b;
   display: flex;
   align-items: center;
   gap: 5px;
@@ -177,52 +204,193 @@
 
 .notif-alert-msg {
   margin: 6px 0 10px 0;
-  color: #c0392b;
-  font-size: 0.95rem;
+  color: #b91c1c;
+  font-size: 0.92rem;
+  line-height: 1.4;
 }
 
-.notif-read .notif-alert-msg {
-  color: #555;
+.notif-msg-clean {
+  margin: 6px 0 10px 0;
+  color: #334155;
+  font-size: 0.92rem;
+  line-height: 1.4;
 }
 
 .notif-footer-row {
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
   font-size: 0.82rem;
-  color: #7f8c8d;
+  color: #64748b;
 }
 
 .notif-cta {
-  color: #3498db;
-  font-weight: 600;
+  color: #2980b9;
+  font-weight: 700;
 }
 
 .btn-delete-notif {
   background: none;
   border: none;
-  color: #bdc3c7;
-  font-size: 1.1rem;
+  color: #cbd5e1;
+  font-size: 1rem;
   cursor: pointer;
   padding: 8px;
-  border-radius: 6px;
-  transition: color 0.2s, background 0.2s;
+  border-radius: 8px;
+  transition: color 0.15s, background 0.15s;
 }
 
 .btn-delete-notif:hover {
   color: #e74c3c;
-  background-color: #fceceb;
+  background: #fee2e2;
 }
 
-.notif-empty {
-  text-align: center;
-  background: #f8f9fa;
-  padding: 50px 20px;
-  border-radius: 12px;
-  border: 2px dashed #dee2e6;
+/* =========================================================
+   PLANTILLA EXCLUSIVA 1: CHAT CLÍNICO (AZUL ÍNDIGO)
+   ========================================================= */
+.notif-template-chat {
+  border-left: 5px solid #2563eb;
 }
 
-.notif-empty-icon {
-  font-size: 3.5rem;
-  color: #ced4da;
-  margin-bottom: 12px;
+.notif-chat-unread {
+  background-color: #f8fbff;
+  border-color: #bfdbfe;
+  border-left: 5px solid #2563eb;
+}
+
+.icon-box-chat {
+  background-color: #dbeafe;
+  color: #1d4ed8;
+}
+
+.tag-categoria-chat {
+  background-color: #dbeafe;
+  color: #1e40af;
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 6px;
+  letter-spacing: 0.4px;
+}
+
+.notif-chat-bubble-preview {
+  background-color: #f1f5f9;
+  border-left: 3px solid #3b82f6;
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin: 6px 0 10px 0;
+  color: #1e293b;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.cta-chat {
+  color: #1d4ed8;
+}
+
+/* =========================================================
+   PLANTILLA EXCLUSIVA 2: RECETAS E INDICACIONES (ESMERALDA)
+   ========================================================= */
+.notif-template-receta {
+  border-left: 5px solid #0d9488;
+}
+
+.notif-receta-unread {
+  background-color: #f0fdfa;
+  border-color: #99f6e4;
+  border-left: 5px solid #0d9488;
+}
+
+.icon-box-receta {
+  background-color: #ccfbf1;
+  color: #0f766e;
+}
+
+.tag-categoria-receta {
+  background-color: #ccfbf1;
+  color: #115e59;
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 6px;
+  letter-spacing: 0.4px;
+}
+
+.notif-receta-box-preview {
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-left: 3px solid #0d9488;
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin: 6px 0 10px 0;
+  color: #1e293b;
+  font-size: 0.88rem;
+}
+
+.notif-receta-box-preview p {
+  margin: 4px 0 0 0;
+  white-space: pre-wrap;
+  color: #334155;
+}
+
+.cta-receta {
+  color: #0f766e;
+}
+
+/* =========================================================
+   PLANTILLA EXCLUSIVA 3: CITAS MÉDICAS (VIOLETA)
+   ========================================================= */
+.notif-template-cita {
+  border-left: 5px solid #7c3aed;
+}
+
+.notif-cita-unread {
+  background-color: #faf5ff;
+  border-left: 5px solid #7c3aed;
+}
+
+.icon-box-cita {
+  background-color: #ede9fe;
+  color: #6d28d9;
+}
+
+.tag-categoria-cita {
+  background-color: #ede9fe;
+  color: #5b21b6;
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.cta-cita {
+  color: #6d28d9;
+}
+
+/* =========================================================
+   PLANTILLA EXCLUSIVA 4: VIGENCIA (ÁMBAR)
+   ========================================================= */
+.notif-template-vigencia {
+  border-left: 5px solid #d97706;
+}
+
+.notif-vigencia-unread {
+  background-color: #fffbeb;
+  border-left: 5px solid #d97706;
+}
+
+.icon-box-vigencia {
+  background-color: #fef3c7;
+  color: #d97706;
+}
+
+.tag-categoria-vigencia {
+  background-color: #fef3c7;
+  color: #92400e;
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 6px;
 }

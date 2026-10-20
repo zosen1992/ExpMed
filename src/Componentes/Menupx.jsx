@@ -4,18 +4,14 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { auth, db } from '../firebase'; 
 import { onValue, ref, get } from 'firebase/database';
 import { signOut } from 'firebase/auth';
-
 import { GiBookPile } from "react-icons/gi";
 import { GoBook } from "react-icons/go";
 import { PiSealWarningDuotone } from "react-icons/pi";
 import { LuHeartPulse } from "react-icons/lu";
-import { MdOutlineBloodtype } from "react-icons/md";
+import { MdOutlineBloodtype, MdNotificationsActive, MdOutlineBackspace } from "react-icons/md";
 import { FcInfo } from "react-icons/fc";
-import { 
-    FaHome, FaPhoneAlt, FaEnvelope, FaMapMarkerAlt, 
-    FaBirthdayCake, FaSignOutAlt, FaUserMd, FaSyringe, FaCalendarCheck 
-} from "react-icons/fa";
-import { MdOutlineBackspace } from "react-icons/md";
+import { FaHome, FaPhoneAlt, FaEnvelope, FaMapMarkerAlt, FaBirthdayCake, FaSignOutAlt, FaUserMd, FaSyringe, FaCalendarCheck, FaComments } from "react-icons/fa";
+//import { MdOutlineEmojiPeople, MdOutlineGroups, MdNotificationsActive, MdAdminPanelSettings, MdChatBubbleOutline } from "react-icons/md";
 
 function Menupx() {
     const { id } = useParams();
@@ -25,6 +21,7 @@ function Menupx() {
     const [paciente, setPaciente] = useState({});
     const [cargando, setCargando] = useState(true);
     const [tieneAlergias, setTieneAlergias] = useState(false);
+    const [noLeidasPx, setNoLeidasPx] = useState(0);
     const [rolActual, setRolActual] = useState(localStorage.getItem('rolActivo') || '');
 
     useEffect(() => {
@@ -32,8 +29,8 @@ function Menupx() {
             if (!myuid) return;
             const rolGuardado = localStorage.getItem('rolActivo');
             const ramas = rolGuardado 
-                ? [rolGuardado, 'medico', 'enfermeria', 'enfermero', 'enfemero', 'px', 'otro'] 
-                : ['medico', 'enfermeria', 'enfermero', 'enfemero', 'px', 'otro'];
+                ? [rolGuardado, 'medico', 'enfermeria', 'enfermero', 'enfemero', 'px', 'admin', 'otro'] 
+                : ['medico', 'enfermeria', 'enfermero', 'enfemero', 'px', 'admin', 'otro'];
 
             for (const r of ramas) {
                 const snap = await get(ref(db, `usuarios/${r}/${myuid}`));
@@ -74,9 +71,21 @@ function Menupx() {
                 setTieneAlergias(snapshot.exists());
             });
 
+            // Escuchar las notificaciones del paciente para mostrar contador de no leídas
+            const notifRef = ref(db, `notificaciones/${id}`);
+            const unsubscribeNotif = onValue(notifRef, (snapshot) => {
+                if (snapshot.exists()) {
+                    const lista = Object.values(snapshot.val());
+                    setNoLeidasPx(lista.filter(n => !n.leido).length);
+                } else {
+                    setNoLeidasPx(0);
+                }
+            });
+
             return () => {
                 unsubscribePx();
                 unsubscribeAlergias();
+                unsubscribeNotif();
             };
         }
     }, [id]);
@@ -84,6 +93,7 @@ function Menupx() {
     const handleCerrarSesionPx = async () => {
         try {
             localStorage.removeItem('rolActivo');
+            localStorage.removeItem('vigenciaVencida');
             await signOut(auth);
             navigate('/login', { replace: true });
         } catch (error) {
@@ -132,10 +142,18 @@ function Menupx() {
 
             <div className='menupx-layout'>
                 <aside className='px-profile-card'>
-                    <img 
-                        src={paciente.fotoperfil || 'https://cdn-icons-png.flaticon.com/512/387/387561.png'} 
+            <img 
+                        src={
+                            paciente.fotoperfil && paciente.fotoperfil !== 'null' 
+                                ? paciente.fotoperfil 
+                                : 'https://cdn-icons-png.flaticon.com/512/387/387561.png'
+                        } 
                         alt="Perfil Paciente" 
                         className='px-avatar'
+                        onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = 'https://cdn-icons-png.flaticon.com/512/387/387561.png';
+                        }}
                     />
                     
                     <h2 className='px-name'>
@@ -149,9 +167,7 @@ function Menupx() {
                     
                     <span className='px-age'>{edad} años</span>
 
-                    <div className='px-info-list'> <Link to={`/mis-citas/${id}`} className='action-card'>
-                    <FaCalendarCheck className='action-icon text-primary'/><span className='action-title'>{esUsuarioPx ? 'Mis Citas' : 'Citas del Paciente'}</span>
-                    </Link>
+                    <div className='px-info-list'>
                         <div className='px-info-item'><FaBirthdayCake className="info-icon"/> {paciente.fecha_nac || paciente.fechanacimiento || 'N/D'}</div>
                         <div className='px-info-item'><FaPhoneAlt className="info-icon"/> {paciente.num_cel || paciente.celular || 'Sin celular'}</div>
                         <div className='px-info-item'><FaEnvelope className="info-icon"/> <span className="truncate-text">{paciente.correo || 'Sin correo'}</span></div>
@@ -160,13 +176,18 @@ function Menupx() {
                 </aside>
 
                 <main className='px-actions-grid'>
-                    {/* HISTORIA CLÍNICA: Solo Médico / Otro */}
+                    {/* HISTORIA CLÍNICA: Solo Médico / Admin */}
                     {!esUsuarioPx && !esEnfermeria && (
                         <Link to={`/PHc/${id}`} className='action-card'>        
                             <GiBookPile className='action-icon text-primary'/>
                             <span className='action-title'>Historia Clínica</span>
                         </Link>
                     )}
+
+                    <Link to={`/chat`} className='action-card'>        
+                             <FaComments className='action-icon text-primary'/>
+                             <span className='action-title'>Chat Médico</span>
+                         </Link>
 
                     {/* VISITA MÉDICA (Personal clínico) vs PROCEDIMIENTOS (Paciente) */}
                     {!esUsuarioPx ? (
@@ -202,12 +223,41 @@ function Menupx() {
                         <span className='action-title'>Información Gral.</span>
                     </Link>
 
-                    {/* BUSCAR PROFESIONAL: Exclusivo para Paciente (px) */}
+                    {/* CITAS DEL PACIENTE */}
+                    <Link to={`/mis-citas/${id}`} className='action-card'>        
+                        <FaCalendarCheck className='action-icon text-primary'/>
+                        <span className='action-title'>{esUsuarioPx ? 'Mis Citas' : 'Citas del Paciente'}</span>
+                    </Link>
+
+                    {/* APARTADO EXCLUSIVO CUANDO EL PACIENTE ACCEDE: HISTORIAL DE NOTIFICACIONES Y BUSCAR PROFESIONAL */}
                     {esUsuarioPx && (
-                        <Link to={`/buscar-profesional`} className='action-card'>        
-                            <FaUserMd className='action-icon text-primary'/>
-                            <span className='action-title'>Buscar Profesional</span>
-                        </Link>
+                        <>
+                            <Link to={`/notificaciones`} className='action-card' style={{ position: 'relative' }}>        
+                                <MdNotificationsActive className='action-icon' style={{ color: noLeidasPx > 0 ? '#e74c3c' : '#3498db' }}/>
+                                <span className='action-title'>Notificaciones</span>
+                                {noLeidasPx > 0 && (
+                                    <span style={{
+                                        position: 'absolute',
+                                        top: '12px',
+                                        right: '12px',
+                                        backgroundColor: '#e74c3c',
+                                        color: 'white',
+                                        fontSize: '0.78rem',
+                                        fontWeight: 'bold',
+                                        padding: '3px 9px',
+                                        borderRadius: '20px',
+                                        boxShadow: '0 2px 6px rgba(231, 76, 60, 0.4)'
+                                    }}>
+                                        {noLeidasPx} nueva{noLeidasPx > 1 ? 's' : ''}
+                                    </span>
+                                )}
+                            </Link>
+
+                            <Link to={`/buscar-profesional`} className='action-card'>        
+                                <FaUserMd className='action-icon text-primary'/>
+                                <span className='action-title'>Buscar Profesional</span>
+                            </Link>
+                        </>
                     )}
                 </main>
             </div>
